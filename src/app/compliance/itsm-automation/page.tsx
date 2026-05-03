@@ -31,9 +31,9 @@ const platformMeta: Record<ITSMPlatform, { name: string; color: string; fields: 
 };
 
 const demoIntegrations: ITSMIntegration[] = [
-  { platform: 'servicenow', enabled: true, instance_url: 'https://acme.service-now.com', api_key: 'snk_8f4a2c1d-e9b7-4ace-...-a1b2c3d4e5f6', username: 'apexaegis-svc@acme.com', routing_key: '', service_id: '', last_synced: '2025-01-15T08:32:00Z', status: 'connected', tickets_synced_24h: 23 },
-  { platform: 'jira', enabled: true, instance_url: 'https://acme.atlassian.net', api_key: 'ATATT3x-...-jira-api-token-2025', username: 'security-bot@acme.com', routing_key: '', service_id: '', last_synced: '2025-01-15T08:28:00Z', status: 'connected', tickets_synced_24h: 11 },
-  { platform: 'pagerduty', enabled: false, instance_url: 'https://api.pagerduty.com', api_key: '', username: '', routing_key: 'R04F...KEXAMPLE', service_id: 'P1A2B3C', last_synced: null, status: 'not_configured', tickets_synced_24h: 0 },
+  { platform: 'servicenow', enabled: true, instance_url: 'https://acme.service-now.com', api_key: '••••••••••••••••••••••••', username: 'apexaegis-svc@acme.com', routing_key: '', service_id: '', last_synced: '2025-01-15T08:32:00Z', status: 'connected', tickets_synced_24h: 23 },
+  { platform: 'jira', enabled: true, instance_url: 'https://acme.atlassian.net', api_key: '••••••••••••••••••••••••', username: 'security-bot@acme.com', routing_key: '', service_id: '', last_synced: '2025-01-15T08:28:00Z', status: 'connected', tickets_synced_24h: 11 },
+  { platform: 'pagerduty', enabled: false, instance_url: 'https://api.pagerduty.com', api_key: '', username: '', routing_key: '••••••••••••••••••••••••', service_id: 'P1A2B3C', last_synced: null, status: 'not_configured', tickets_synced_24h: 0 },
 ];
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
