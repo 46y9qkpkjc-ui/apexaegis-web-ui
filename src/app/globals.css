@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #ecfeff;
+  --color-brand-100: #cffafe;
+  --color-brand-400: #22d3ee;
+  --color-brand-500: #06b6d4;
+  --color-brand-600: #0891b2;
+  --color-brand-700: #0e7490;
+  --color-brand-900: #164e63;
+}
+
+:root {
+  --sidebar-width: 240px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* ── Form Inputs ────────────────────────────────────────────── */
+.input-field {
+  @apply w-full rounded-lg border border-gray-700/60 bg-gray-800/40 px-3 py-2
+    text-sm text-gray-100 placeholder-gray-500
+    focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/15
+    transition-all;
+}
+
+select.input-field {
+  @apply appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M6%208.825L1.175%204%202.238%202.938%206%206.7l3.763-3.763L10.825%204z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat pr-8;
+}
+
+/* ── AI panel animation ─────────────────────────────────────── */
+@keyframes slidein {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-slidein {
+  animation: slidein 0.2s ease-out;
+}
+
+/* ── Glass card (modern panels) ─────────────────────────────── */
+.glass-card {
+  @apply bg-gray-900/60 backdrop-blur-xl border border-gray-800/50 rounded-xl;
+}
+
+/* ── Focus ring utility ─────────────────────────────────────── */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0;
+}
