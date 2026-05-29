@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const API_BACKEND_URL = process.env.API_BACKEND_URL || 'http://localhost:9090';
+
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
@@ -8,7 +10,7 @@ const nextConfig = {
     return [
       {
         source: '/api/v1/:path*',
-        destination: 'http://localhost:9090/api/v1/:path*',
+        destination: `${API_BACKEND_URL}/api/v1/:path*`,
       },
     ];
   },
