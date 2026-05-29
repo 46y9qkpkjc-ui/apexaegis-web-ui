@@ -22,6 +22,7 @@ interface GatewayNode {
   throughput: string;
   uptime: string;
   lastHeartbeat: string;
+  mtlsIssued: boolean;
   adminDisabled: boolean;
   disableReason?: string;
 }
@@ -54,8 +55,8 @@ function fromApi(gw: ApiGateway): GatewayNode {
 
   return {
     id: gw.id,
-    name: `gw-${gw.id}`,
-    region: gw.location,
+    name: gw.name || `gw-${gw.id}`,
+    region: gw.location || gw.region,
     location: gw.id,
     status: statusMap[gw.status] ?? 'offline',
     publicIp: gw.public_host,
@@ -66,6 +67,7 @@ function fromApi(gw: ApiGateway): GatewayNode {
     throughput: '—',
     uptime,
     lastHeartbeat: lastSeen,
+    mtlsIssued: gw.mtls_issued,
     adminDisabled: false,
   };
 }
@@ -411,6 +413,11 @@ export default function GatewayNodesPage() {
                         <StatusIcon size={10} />
                         {st.label}
                       </span>
+                      {gw.mtlsIssued && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-emerald-900/30 text-emerald-400 border-emerald-800">
+                          <Lock size={10} /> mTLS
+                        </span>
+                      )}
                       {gw.adminDisabled && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-red-900/40 text-red-400 border-red-800">
                           <Ban size={10} /> Admin Disabled
