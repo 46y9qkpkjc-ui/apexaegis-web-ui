@@ -45,6 +45,18 @@ function toConfig(p: SslProfile): Record<string, unknown> {
   };
 }
 
+const modeBadge: Record<string, { label: string; color: string }> = {
+  'full-inspection':        { label: 'Full Inspection',        color: 'bg-blue-900/20 border-blue-700/40 text-blue-400' },
+  'certificate-inspection': { label: 'Certificate Inspection', color: 'bg-yellow-900/20 border-yellow-700/40 text-yellow-400' },
+  'no-inspection':          { label: 'No Inspection',          color: 'bg-gray-800 border-gray-600 text-gray-400' },
+};
+
+const certActionBadge: Record<string, { label: string; color: string }> = {
+  'block':      { label: 'Block',      color: 'bg-red-900/20 border-red-700/40 text-red-400' },
+  'allow-warn': { label: 'Allow+Warn', color: 'bg-yellow-900/20 border-yellow-700/40 text-yellow-400' },
+  'allow':      { label: 'Allow',      color: 'bg-green-900/20 border-green-700/40 text-green-400' },
+};
+
 export default function SslInspectionPage() {
   const [profiles, setProfiles] = useState<SslProfile[]>([]);
   const [viewProfile, setViewProfile] = useState<SslProfile | null>(null);

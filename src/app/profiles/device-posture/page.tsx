@@ -44,6 +44,20 @@ const checkTypes: Record<string, { label: string; description: string }> = {
   'mfa-enrolled': { label: 'MFA Enrolled', description: 'User MFA enrollment required on device' },
 };
 
+const actionColor: Record<string, string> = {
+  block: 'bg-red-900/20 border-red-700/40 text-red-400',
+  warn:  'bg-yellow-900/20 border-yellow-700/40 text-yellow-400',
+  log:   'bg-gray-800 border-gray-600 text-gray-400',
+};
+
+const platformIcons: Record<string, { label: string; color: string }> = {
+  windows: { label: 'Windows', color: 'bg-blue-900/20 border-blue-700/40 text-blue-400' },
+  macos:   { label: 'macOS',   color: 'bg-gray-800 border-gray-600 text-gray-300' },
+  linux:   { label: 'Linux',   color: 'bg-orange-900/20 border-orange-700/40 text-orange-400' },
+  ios:     { label: 'iOS',     color: 'bg-purple-900/20 border-purple-700/40 text-purple-400' },
+  android: { label: 'Android', color: 'bg-green-900/20 border-green-700/40 text-green-400' },
+};
+
 function fromApi(p: ApiProfile): DevicePostureProfile {
   const c = p.config as Record<string, unknown>;
   return {

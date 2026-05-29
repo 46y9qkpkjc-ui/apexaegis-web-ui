@@ -211,9 +211,9 @@ export default function UsersGroupsPage() {
             <p className="text-sm text-gray-500">Manage user identities, group memberships, and access roles</p>
           </div>
         </div>
-        <button onClick={() => tab === 'users' ? setShowCreateUser(true) : setShowCreateGroup(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors">
+        <button onClick={() => tab === 'groups' ? setShowCreateGroup(true) : setShowCreateUser(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors">
           <Plus size={16} />
-          {tab === 'users' ? 'Add User' : 'Create Group'}
+          {tab === 'groups' ? 'Create Group' : 'Add User'}
         </button>
       </div>
 
