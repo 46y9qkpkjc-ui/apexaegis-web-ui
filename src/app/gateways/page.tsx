@@ -1,11 +1,12 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Server, Activity, CheckCircle, XCircle, AlertTriangle, RefreshCw, MapPin,
   Power, X, Ban, Globe, Network, Route, Shield, Zap, Radio, Waypoints,
   GitBranch, Lock, Eye, ChevronRight, BarChart3, ArrowLeftRight,
   Search,
 } from 'lucide-react';
+import { fetchGateways, type ApiGateway } from '@/lib/gateway-api';
 
 interface GatewayNode {
   id: string;
@@ -25,44 +26,49 @@ interface GatewayNode {
   disableReason?: string;
 }
 
-const demoGateways: GatewayNode[] = [
-  {
-    id: '1', name: 'gw-ap-southeast-1', region: 'Asia Pacific (Singapore)', location: 'ap-southeast-1',
-    status: 'healthy', publicIp: '13.212.88.42', version: '2.8.1',
-    cpu: 22, memory: 38, tunnels: 486, throughput: '3.8 Gbps', uptime: '52d 8h', lastHeartbeat: '6s ago',
+function fromApi(gw: ApiGateway): GatewayNode {
+  const statusMap: Record<string, GatewayNode['status']> = {
+    online: 'healthy',
+    degraded: 'degraded',
+    offline: 'offline',
+    draining: 'degraded',
+  };
+
+  const lastSeen = gw.last_heartbeat
+    ? (() => {
+        const diffSec = Math.floor((Date.now() - new Date(gw.last_heartbeat).getTime()) / 1000);
+        if (diffSec < 60) return `${diffSec}s ago`;
+        if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+        return `${Math.floor(diffSec / 3600)}h ago`;
+      })()
+    : '—';
+
+  const uptime = gw.registered_at
+    ? (() => {
+        const diffSec = Math.floor((Date.now() - new Date(gw.registered_at).getTime()) / 1000);
+        const h = Math.floor(diffSec / 3600);
+        const d = Math.floor(h / 24);
+        return d > 0 ? `${d}d ${h % 24}h` : `${h}h ${Math.floor((diffSec % 3600) / 60)}m`;
+      })()
+    : '—';
+
+  return {
+    id: gw.id,
+    name: `gw-${gw.id}`,
+    region: gw.location,
+    location: gw.id,
+    status: statusMap[gw.status] ?? 'offline',
+    publicIp: gw.public_host,
+    version: gw.version || '1.0.0',
+    cpu: 0,
+    memory: 0,
+    tunnels: 0,
+    throughput: '—',
+    uptime,
+    lastHeartbeat: lastSeen,
     adminDisabled: false,
-  },
-  {
-    id: '2', name: 'gw-ap-southeast-2', region: 'Asia Pacific (Sydney)', location: 'ap-southeast-2',
-    status: 'healthy', publicIp: '54.253.61.19', version: '2.8.1',
-    cpu: 15, memory: 29, tunnels: 218, throughput: '1.6 Gbps', uptime: '52d 8h', lastHeartbeat: '8s ago',
-    adminDisabled: false,
-  },
-  {
-    id: '3', name: 'gw-us-east-1a', region: 'US East (Virginia)', location: 'us-east-1',
-    status: 'healthy', publicIp: '54.123.45.67', version: '2.8.1',
-    cpu: 23, memory: 41, tunnels: 312, throughput: '2.4 Gbps', uptime: '47d 12h', lastHeartbeat: '10s ago',
-    adminDisabled: false,
-  },
-  {
-    id: '4', name: 'gw-eu-west-1a', region: 'EU West (Ireland)', location: 'eu-west-1',
-    status: 'healthy', publicIp: '52.17.88.201', version: '2.8.1',
-    cpu: 31, memory: 52, tunnels: 245, throughput: '2.1 Gbps', uptime: '32d 6h', lastHeartbeat: '12s ago',
-    adminDisabled: false,
-  },
-  {
-    id: '5', name: 'gw-ap-south-1a', region: 'Asia Pacific (Mumbai)', location: 'ap-south-1',
-    status: 'degraded', publicIp: '13.235.44.91', version: '2.8.0',
-    cpu: 78, memory: 82, tunnels: 410, throughput: '3.2 Gbps', uptime: '12d 3h', lastHeartbeat: '45s ago',
-    adminDisabled: false,
-  },
-  {
-    id: '6', name: 'gw-eu-central-1a', region: 'EU Central (Frankfurt)', location: 'eu-central-1',
-    status: 'offline', publicIp: '18.185.33.107', version: '2.7.4',
-    cpu: 0, memory: 0, tunnels: 0, throughput: '0 Mbps', uptime: '—', lastHeartbeat: '2 hrs ago',
-    adminDisabled: true, disableReason: 'Maintenance window — firmware upgrade',
-  },
-];
+  };
+}
 
 /* ─── Singtel Backbone — 428 PoPs in 362 cities ────────────── */
 interface SingtelPoP {
@@ -239,13 +245,33 @@ function CpuBar({ value }: { value: number }) {
 type ActiveTab = 'gateways' | 'backbone' | 'scion';
 
 export default function GatewayNodesPage() {
-  const [gateways, setGateways] = useState<GatewayNode[]>(demoGateways);
+  const [gateways, setGateways] = useState<GatewayNode[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [disableModal, setDisableModal] = useState<{ gwId: string; action: 'disable' | 'enable' } | null>(null);
   const [disableReason, setDisableReason] = useState('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('gateways');
   const [expandedRegion, setExpandedRegion] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<ScionPath | null>(null);
   const [backboneSearch, setBackboneSearch] = useState('');
+
+  const loadGateways = useCallback(async () => {
+    try {
+      const data = await fetchGateways();
+      setGateways(data.map(fromApi));
+      setLastRefresh(new Date());
+    } catch {
+      // keep existing state on error
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadGateways();
+    const interval = setInterval(loadGateways, 30_000);
+    return () => clearInterval(interval);
+  }, [loadGateways]);
 
   const handleAdminToggle = () => {
     if (!disableModal) return;
@@ -295,9 +321,12 @@ export default function GatewayNodesPage() {
             </p>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors">
-          <RefreshCw size={16} />
-          Refresh
+        <button
+          onClick={loadGateways}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
+        >
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          {lastRefresh ? `Updated ${Math.floor((Date.now() - lastRefresh.getTime()) / 1000)}s ago` : 'Refresh'}
         </button>
       </div>
 
@@ -352,6 +381,18 @@ export default function GatewayNodesPage() {
 
       {/* Gateway cards */}
       <div className="grid grid-cols-1 gap-4">
+        {loading && gateways.length === 0 && (
+          <div className="flex items-center justify-center py-16 text-gray-500">
+            <RefreshCw size={20} className="animate-spin mr-2" /> Loading gateways...
+          </div>
+        )}
+        {!loading && gateways.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-gray-500 border border-gray-800 rounded-xl">
+            <Server size={32} className="mb-3 opacity-40" />
+            <p className="text-sm">No gateways registered yet.</p>
+            <p className="text-xs mt-1 text-gray-600">Gateways auto-register every 30 seconds.</p>
+          </div>
+        )}
         {gateways.map(gw => {
           const st = statusConfig[gw.status];
           const StatusIcon = st.icon;
