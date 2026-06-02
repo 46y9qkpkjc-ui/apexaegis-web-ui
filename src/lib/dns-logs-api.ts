@@ -9,6 +9,9 @@ export interface DNSLog {
   domain: string;
   query_type: string;
   verdict: 'allow' | 'block' | 'threat_detected';
+  action?: string;
+  severity?: string;
+  policy_name?: string;
   threat_level?: string;
   threat_category?: string;
   response_time_ms: number;
@@ -35,7 +38,10 @@ export interface DNSLogFilters {
   end_time?: string;
   limit?: number;
   offset?: number;
+  action?: string;
 }
+
+export type DNSAccessLog = DNSLog;
 
 export interface DNSLogsResponse {
   logs: DNSLog[];
@@ -78,6 +84,7 @@ export async function getDNSLogs(
   if (filters?.client_ip) params.append('client_ip', filters.client_ip);
   if (filters?.verdict) params.append('verdict', filters.verdict);
   if (filters?.threat_level) params.append('threat_level', filters.threat_level);
+  if (filters?.action) params.append('action', filters.action);
   if (filters?.start_time) params.append('start_time', filters.start_time);
   if (filters?.end_time) params.append('end_time', filters.end_time);
   if (filters?.limit) params.append('limit', filters.limit.toString());

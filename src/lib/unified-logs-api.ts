@@ -51,24 +51,31 @@ export function convertDNSLogToUnified(dnsLog: DNSAccessLog): UnifiedLogEntry {
     low: 'low',
     none: 'info',
   };
+  const threatLevel = dnsLog.threat_level || 'none';
+  const mappedAction = actionMap[dnsLog.verdict] || 'allow';
+  const action = (dnsLog.action as UnifiedLogEntry['action'] | undefined) || mappedAction;
+  const severity =
+    (dnsLog.severity as UnifiedLogEntry['severity'] | undefined) ||
+    severityMap[threatLevel] ||
+    'low';
 
   return {
     id: dnsLog.id,
     timestamp: dnsLog.created_at,
     user: 'dnsfilter', // System user for DNS
     sourceIp: dnsLog.client_ip,
-    action: dnsLog.action as any || actionMap[dnsLog.verdict] || 'allow',
+    action,
     destination: dnsLog.domain,
     category: dnsLog.threat_category || 'DNS Query',
     policyName: dnsLog.policy_name || 'Default DNS Policy',
     bytesIn: 0, // DNS doesn't track bytes
     bytesOut: dnsLog.response_code ? 64 : 0, // Typical DNS response size
-    severity: dnsLog.severity as any || severityMap[dnsLog.threat_level] || 'low',
+    severity,
     gatewayRegion: 'us-east-1', // Default region (would be set by gateway)
     logType: 'dns',
     dnsSpecific: {
       queryType: dnsLog.query_type,
-      threatLevel: dnsLog.threat_level || 'none',
+      threatLevel,
       responseCode: dnsLog.response_code || 0,
       responseTimeMs: dnsLog.response_time_ms,
       threatCategory: dnsLog.threat_category || '',

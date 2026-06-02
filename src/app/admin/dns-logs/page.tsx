@@ -1,32 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, Shield } from 'lucide-react';
+import { Fragment, useEffect, useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 
 interface DNSLog {
   id: string;
@@ -49,6 +24,38 @@ interface DNSSummary {
   block_rate_percent: number;
   avg_response_time_ms: number;
 }
+
+function Badge({ children, className = '' }: Readonly<{ children: React.ReactNode; className?: string }>) {
+  return (
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function Card({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">{children}</div>;
+}
+
+function CardHeader({ children, className = '' }: Readonly<{ children: React.ReactNode; className?: string }>) {
+  return <div className={`mb-3 ${className}`}>{children}</div>;
+}
+
+function CardTitle({ children, className = '' }: Readonly<{ children: React.ReactNode; className?: string }>) {
+  return <h2 className={`font-semibold text-gray-100 ${className}`}>{children}</h2>;
+}
+
+function CardDescription({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <p className="text-sm text-gray-500">{children}</p>;
+}
+
+function CardContent({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <div>{children}</div>;
+}
+
+const inputClass = 'w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-blue-500/50 focus:outline-none';
+const buttonClass = 'rounded-lg bg-gray-800 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50';
+const primaryButtonClass = 'rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500';
 
 export default function DNSLogsPage() {
   const [logs, setLogs] = useState<DNSLog[]>([]);
@@ -145,7 +152,7 @@ export default function DNSLogsPage() {
       case 'threat_detected':
         return <Badge className="bg-orange-100 text-orange-800">Threat</Badge>;
       default:
-        return <Badge variant="outline">{verdict}</Badge>;
+        return <Badge className="border-gray-700 text-gray-300">{verdict}</Badge>;
     }
   };
 
@@ -161,7 +168,7 @@ export default function DNSLogsPage() {
       case 'low':
         return <Badge className="bg-blue-400 text-white">Low</Badge>;
       default:
-        return <Badge variant="outline">{level}</Badge>;
+        return <Badge className="border-gray-700 text-gray-300">{level}</Badge>;
     }
   };
 
@@ -235,94 +242,91 @@ export default function DNSLogsPage() {
           <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
             <div>
               <label className="text-sm font-medium">Domain</label>
-              <Input
+              <input
                 placeholder="example.com"
                 value={domain}
                 onChange={(e) => {
                   setDomain(e.target.value);
                   setOffset(0);
                 }}
-                className="mt-1"
+                className={`mt-1 ${inputClass}`}
               />
             </div>
 
             <div>
               <label className="text-sm font-medium">Client IP</label>
-              <Input
+              <input
                 placeholder="192.168.1.1"
                 value={clientIp}
                 onChange={(e) => {
                   setClientIp(e.target.value);
                   setOffset(0);
                 }}
-                className="mt-1"
+                className={`mt-1 ${inputClass}`}
               />
             </div>
 
             <div>
               <label className="text-sm font-medium">Verdict</label>
-              <Select value={verdict} onValueChange={(v) => {
-                setVerdict(v);
-                setOffset(0);
-              }}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All</SelectItem>
-                  <SelectItem value="allow">Allowed</SelectItem>
-                  <SelectItem value="block">Blocked</SelectItem>
-                  <SelectItem value="threat_detected">Threat</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                value={verdict}
+                onChange={(e) => {
+                  setVerdict(e.target.value);
+                  setOffset(0);
+                }}
+                className={`mt-1 ${inputClass}`}
+              >
+                <option value="">All</option>
+                <option value="allow">Allowed</option>
+                <option value="block">Blocked</option>
+                <option value="threat_detected">Threat</option>
+              </select>
             </div>
 
             <div>
               <label className="text-sm font-medium">Threat Level</label>
-              <Select value={threatLevel} onValueChange={(v) => {
-                setThreatLevel(v);
-                setOffset(0);
-              }}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                value={threatLevel}
+                onChange={(e) => {
+                  setThreatLevel(e.target.value);
+                  setOffset(0);
+                }}
+                className={`mt-1 ${inputClass}`}
+              >
+                <option value="">All</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
             </div>
 
             <div>
               <label className="text-sm font-medium">Time Range</label>
-              <Select value={hoursBack} onValueChange={(v) => {
-                setHoursBack(v);
-                setOffset(0);
-              }}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Last 1h</SelectItem>
-                  <SelectItem value="6">Last 6h</SelectItem>
-                  <SelectItem value="24">Last 24h</SelectItem>
-                  <SelectItem value="72">Last 72h</SelectItem>
-                  <SelectItem value="168">Last 7d</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                value={hoursBack}
+                onChange={(e) => {
+                  setHoursBack(e.target.value);
+                  setOffset(0);
+                }}
+                className={`mt-1 ${inputClass}`}
+              >
+                <option value="1">Last 1h</option>
+                <option value="6">Last 6h</option>
+                <option value="24">Last 24h</option>
+                <option value="72">Last 72h</option>
+                <option value="168">Last 7d</option>
+              </select>
             </div>
           </div>
 
           <div className="flex gap-2 mt-4">
-            <Button onClick={fetchDNSData} variant="default">
+            <button onClick={fetchDNSData} className={primaryButtonClass}>
               Apply Filters
-            </Button>
-            <Button onClick={resetFilters} variant="outline">
+            </button>
+            <button onClick={resetFilters} className={buttonClass}>
               Reset
-            </Button>
+            </button>
           </div>
         </CardContent>
       </Card>
@@ -352,47 +356,46 @@ export default function DNSLogsPage() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Domain</TableHead>
-                      <TableHead>Client IP</TableHead>
-                      <TableHead>Query Type</TableHead>
-                      <TableHead>Verdict</TableHead>
-                      <TableHead>Response</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table className="w-full border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-800 text-xs uppercase text-gray-500">
+                      <th className="px-3 py-2 font-medium">Time</th>
+                      <th className="px-3 py-2 font-medium">Domain</th>
+                      <th className="px-3 py-2 font-medium">Client IP</th>
+                      <th className="px-3 py-2 font-medium">Query Type</th>
+                      <th className="px-3 py-2 font-medium">Verdict</th>
+                      <th className="px-3 py-2 font-medium">Response</th>
+                      <th className="px-3 py-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {logs.map((log) => (
-                      <div key={log.id}>
-                        <TableRow
-                          className="cursor-pointer hover:bg-gray-50"
+                      <Fragment key={log.id}>
+                        <tr
+                          className="cursor-pointer border-b border-gray-800/70 hover:bg-gray-800/40"
                           onClick={() =>
                             setExpandedId(
                               expandedId === log.id ? null : log.id
                             )
                           }
                         >
-                          <TableCell className="text-xs">
+                          <td className="px-3 py-3 text-xs text-gray-400">
                             {new Date(log.created_at).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
+                          </td>
+                          <td className="px-3 py-3 font-mono text-sm text-gray-100">
                             {log.domain}
-                          </TableCell>
-                          <TableCell className="text-sm">
+                          </td>
+                          <td className="px-3 py-3 text-sm text-gray-300">
                             {log.client_ip}
-                          </TableCell>
-                          <TableCell className="text-sm">{log.query_type}</TableCell>
-                          <TableCell>{getVerdictBadge(log.verdict)}</TableCell>
-                          <TableCell className="text-xs">
+                          </td>
+                          <td className="px-3 py-3 text-sm text-gray-300">{log.query_type}</td>
+                          <td className="px-3 py-3">{getVerdictBadge(log.verdict)}</td>
+                          <td className="px-3 py-3 text-xs text-gray-400">
                             {log.response_time_ms}ms
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              variant="ghost"
+                          </td>
+                          <td className="px-3 py-3">
+                            <button
+                              className={buttonClass}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setExpandedId(
@@ -401,27 +404,27 @@ export default function DNSLogsPage() {
                               }}
                             >
                               {expandedId === log.id ? 'Hide' : 'Details'}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                            </button>
+                          </td>
+                        </tr>
 
                         {/* Expanded row */}
                         {expandedId === log.id && (
-                          <TableRow className="bg-gray-50">
-                            <TableCell colSpan={7}>
+                          <tr className="border-b border-gray-800 bg-gray-950/70">
+                            <td colSpan={7} className="px-3 py-3">
                               <div className="grid gap-4 grid-cols-2 md:grid-cols-3 p-4 text-sm">
                                 <div>
-                                  <div className="font-medium text-gray-600">
+                                  <div className="font-medium text-gray-500">
                                     Response Code
                                   </div>
-                                  <div className="text-gray-900">
+                                  <div className="text-gray-200">
                                     {log.response_code}
                                   </div>
                                 </div>
 
                                 {log.threat_level && (
                                   <div>
-                                    <div className="font-medium text-gray-600">
+                                    <div className="font-medium text-gray-500">
                                       Threat Level
                                     </div>
                                     <div>
@@ -432,69 +435,68 @@ export default function DNSLogsPage() {
 
                                 {log.threat_category && (
                                   <div>
-                                    <div className="font-medium text-gray-600">
+                                    <div className="font-medium text-gray-500">
                                       Category
                                     </div>
-                                    <div className="text-gray-900">
+                                    <div className="text-gray-200">
                                       {log.threat_category}
                                     </div>
                                   </div>
                                 )}
 
                                 <div className="col-span-full">
-                                  <div className="font-medium text-gray-600">
+                                  <div className="font-medium text-gray-500">
                                     Log ID
                                   </div>
-                                  <div className="font-mono text-xs text-gray-700 break-all">
+                                  <div className="font-mono text-xs text-gray-300 break-all">
                                     {log.id}
                                   </div>
                                 </div>
                               </div>
-                            </TableCell>
-                          </TableRow>
+                            </td>
+                          </tr>
                         )}
-                      </div>
+                      </Fragment>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
 
               {/* Pagination */}
               <div className="flex items-center justify-between mt-4">
-                <Select value={limit} onValueChange={(v) => {
-                  setLimit(v);
-                  setOffset(0);
-                }}>
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(e.target.value);
+                    setOffset(0);
+                  }}
+                  className={`w-24 ${inputClass}`}
+                >
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
 
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
+                  <button
+                    className={buttonClass}
                     onClick={() => setOffset(Math.max(0, offset - parseInt(limit)))}
                     disabled={offset === 0}
                   >
                     Previous
-                  </Button>
-                  <span className="text-sm text-gray-600">
+                  </button>
+                  <span className="text-sm text-gray-500 self-center">
                     {offset + 1} -{' '}
                     {Math.min(offset + parseInt(limit), logs.length)}
                   </span>
-                  <Button
-                    variant="outline"
+                  <button
+                    className={buttonClass}
                     onClick={() => setOffset(offset + parseInt(limit))}
                     disabled={offset + parseInt(limit) >= (summary?.total_queries || 0)}
                   >
                     Next
-                  </Button>
+                  </button>
                 </div>
               </div>
             </>
