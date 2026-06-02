@@ -40,7 +40,6 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/security', icon: GitBranch, label: 'Attack Paths & Segments' },
       { href: '/security/attack-comparison', icon: ShieldOff, label: 'Attack Comparison' },
-      { href: '/security/mitre-attack', icon: Crosshair, label: 'APT Simulation' },
       { href: '/security/ai-ueba', icon: Brain, label: 'AI/ML & UEBA', featureId: 'ueba' },
     ],
   },
@@ -93,7 +92,8 @@ const navGroups: NavGroup[] = [
   {
     label: 'Security Validation',
     items: [
-      { href: '/security/test-my-defence', icon: ShieldAlert, label: 'Test My Defence' },
+      { href: '/security/test-my-defence', icon: ShieldAlert, label: 'Security CheckUp' },
+      { href: '/security/mitre-attack', icon: Crosshair, label: 'APT Simulation' },
       { href: '/security/security-preview', icon: Search, label: 'Security Preview' },
       { href: '/security/attack-path', icon: Crosshair, label: 'Attack Path Analysis' },
       { href: '/security/ssl-scan', icon: Lock, label: 'SSL/TLS Scanner' },

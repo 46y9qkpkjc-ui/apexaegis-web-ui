@@ -348,7 +348,7 @@ export default function TestMyDefencePage() {
         <div className="flex items-center gap-3">
           <Shield size={24} className="text-cyan-400" />
           <div>
-            <h1 className="text-xl font-semibold">Test My Defence</h1>
+            <h1 className="text-xl font-semibold">Security CheckUp</h1>
             <p className="text-sm text-gray-500">
               Security CheckUp — simulate cyber-attacks against ApexAegis to validate your defence posture
             </p>
@@ -463,7 +463,7 @@ export default function TestMyDefencePage() {
           )}
 
           <div className="ml-auto text-[10px] text-gray-600">
-            TTL: {Math.floor(containerEnv.ttl_seconds / 60)}min auto-destroy · 10 containers · Isolated SGT
+            TTL: {Math.floor(containerEnv.ttl_seconds / 60)}min auto-destroy · 10 containers · Isolated validation sandbox
           </div>
         </div>
       </div>
