@@ -37,6 +37,22 @@ interface IdPProvider {
   group_map: Record<string, string>;
 }
 
+interface AuthProfile {
+  id: string;
+  purpose: 'admin_console' | 'desktop_sso' | 'user_portal' | 'scim_provisioning' | 'access_approval';
+  display_name: string;
+  description: string;
+  use_primary_idp: boolean;
+  idp_id?: string;
+  effective_idp_id?: string;
+  effective_idp_name?: string;
+  enabled: boolean;
+  require_mfa: boolean;
+  allow_jit: boolean;
+  allow_scim: boolean;
+  contractor_access: boolean;
+}
+
 const emptyProvider: IdPProvider = {
   id: '', name: '', provider_type: 'okta', enabled: true, is_default: false,
   client_id: '', issuer_url: '', client_secret: '', jwks_uri: '', token_endpoint: '', scopes: ['openid', 'profile', 'email', 'groups'],
@@ -74,6 +90,24 @@ async function fetchProviders(): Promise<IdPProvider[]> {
   if (!res.ok) return [];
   const data = await res.json();
   return (data.identity_providers ?? []).map(normalizeProvider);
+}
+
+async function fetchAuthProfiles(): Promise<AuthProfile[]> {
+  const res = await fetch('/api/v1/identity/auth-profiles', { headers: headers() });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.auth_profiles ?? [];
+}
+
+async function updateAuthProfiles(profiles: AuthProfile[]): Promise<AuthProfile[] | null> {
+  const res = await fetch('/api/v1/identity/auth-profiles', {
+    method: 'PUT',
+    headers: headers(),
+    body: JSON.stringify({ auth_profiles: profiles }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.auth_profiles ?? [];
 }
 
 async function createProvider(p: Partial<IdPProvider>): Promise<string | null> {
@@ -197,7 +231,9 @@ function ProvisioningFields({ prov, onChange }: Readonly<{ prov: IdPProvider; on
 
 export default function IdentityProvidersPage() {
   const [providers, setProviders] = useState<IdPProvider[]>([]);
+  const [authProfiles, setAuthProfiles] = useState<AuthProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingProfiles, setSavingProfiles] = useState(false);
   const [editProvider, setEditProvider] = useState<IdPProvider | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newProv, setNewProv] = useState<IdPProvider>({ ...emptyProvider });
@@ -206,14 +242,34 @@ export default function IdentityProvidersPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const list = await fetchProviders();
+    const [list, profiles] = await Promise.all([fetchProviders(), fetchAuthProfiles()]);
     setProviders(list);
+    setAuthProfiles(profiles);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const connectedCount = providers.filter(p => p.enabled).length;
+  const primaryProvider = providers.find(p => p.enabled && p.is_default) ?? providers.find(p => p.enabled);
+
+  const updateLocalAuthProfile = (purpose: AuthProfile['purpose'], patch: Partial<AuthProfile>) => {
+    setAuthProfiles(prev => prev.map(profile => (
+      profile.purpose === purpose ? { ...profile, ...patch } : profile
+    )));
+  };
+
+  const saveAuthProfiles = async () => {
+    setSavingProfiles(true);
+    const saved = await updateAuthProfiles(authProfiles);
+    setSavingProfiles(false);
+    if (saved) {
+      setAuthProfiles(saved);
+      toast.success('Authentication usage profiles updated');
+    } else {
+      toast.error('Failed to update authentication usage profiles');
+    }
+  };
 
   const handleCreate = async () => {
     if (!newProv.name.trim()) return;
@@ -290,12 +346,108 @@ export default function IdentityProvidersPage() {
         <span className="px-3 py-1.5 rounded-lg bg-green-900/20 border border-green-800/30 text-sm text-green-400">
           Enabled: {connectedCount}
         </span>
+        {primaryProvider && (
+          <span className="px-3 py-1.5 rounded-lg bg-blue-900/20 border border-blue-800/30 text-sm text-blue-300">
+            Primary: {primaryProvider.name}
+          </span>
+        )}
       </div>
 
       {/* Loading state */}
       {loading && (
         <div className="flex items-center justify-center py-12 text-gray-500">
           <Loader2 size={20} className="animate-spin mr-2" /> Loading providers...
+        </div>
+      )}
+
+      {!loading && authProfiles.length > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-semibold">Authentication usage profiles</h2>
+              <p className="text-sm text-gray-500">Reuse the primary IdP by default, or override only where enterprise separation is required.</p>
+            </div>
+            <button
+              onClick={saveAuthProfiles}
+              disabled={savingProfiles}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
+            >
+              {savingProfiles ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+              Save Profiles
+            </button>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {authProfiles.map(profile => {
+              const canOverride = providers.filter(p => p.enabled).length > 0;
+              return (
+                <div key={profile.purpose} className="border border-gray-800 rounded-lg p-4 bg-gray-950/40">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-medium text-gray-200">{profile.display_name}</h3>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] border ${profile.enabled ? 'bg-green-900/20 text-green-400 border-green-800/40' : 'bg-gray-800 text-gray-500 border-gray-700'}`}>
+                          {profile.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{profile.description}</p>
+                    </div>
+                    <button
+                      onClick={() => updateLocalAuthProfile(profile.purpose, { enabled: !profile.enabled })}
+                      className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${profile.enabled ? 'bg-green-600' : 'bg-gray-700'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${profile.enabled ? 'left-4' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3 items-end">
+                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={profile.use_primary_idp}
+                        onChange={e => updateLocalAuthProfile(profile.purpose, { use_primary_idp: e.target.checked })}
+                        className="rounded bg-gray-800 border-gray-700"
+                      />
+                      Use primary IdP
+                    </label>
+                    <select
+                      disabled={profile.use_primary_idp || !canOverride}
+                      value={profile.idp_id ?? ''}
+                      onChange={e => updateLocalAuthProfile(profile.purpose, { idp_id: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm disabled:opacity-50 focus:outline-none focus:border-blue-500/50"
+                    >
+                      <option value="">Select override IdP</option>
+                      {providers.filter(p => p.enabled).map(provider => (
+                        <option key={provider.id} value={provider.id}>{provider.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <input type="checkbox" checked={profile.require_mfa} onChange={e => updateLocalAuthProfile(profile.purpose, { require_mfa: e.target.checked })} className="rounded bg-gray-800 border-gray-700" />
+                      MFA
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <input type="checkbox" checked={profile.allow_jit} onChange={e => updateLocalAuthProfile(profile.purpose, { allow_jit: e.target.checked })} className="rounded bg-gray-800 border-gray-700" />
+                      JIT
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <input type="checkbox" checked={profile.allow_scim} onChange={e => updateLocalAuthProfile(profile.purpose, { allow_scim: e.target.checked })} className="rounded bg-gray-800 border-gray-700" />
+                      SCIM
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <input type="checkbox" checked={profile.contractor_access} onChange={e => updateLocalAuthProfile(profile.purpose, { contractor_access: e.target.checked })} className="rounded bg-gray-800 border-gray-700" />
+                      Contractors
+                    </label>
+                  </div>
+
+                  <div className="mt-3 text-[11px] text-gray-500">
+                    Effective IdP: <span className="text-gray-300">{profile.use_primary_idp ? (primaryProvider?.name ?? 'Primary IdP not configured') : (providers.find(p => p.id === profile.idp_id)?.name ?? 'Override not selected')}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

@@ -1,0 +1,14 @@
+.next/
+node_modules/
+out/
+dist/
+coverage/
+playwright-report/
+test-results/
+tsconfig.tsbuildinfo
+
+.env*.local
+.vercel/
+
+*.log
+.DS_Store

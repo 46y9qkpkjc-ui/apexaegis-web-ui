@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
-import { useAuthStore } from '@/lib/auth-store';
 import { FeatureProvider } from '@/hooks/use-features';
 
 const AUTH_ROUTES = new Set(['/login']);
@@ -11,7 +10,6 @@ const AUTH_ROUTES = new Set(['/login']);
 export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const isAuth = AUTH_ROUTES.has(pathname);
-  const { isDevMode } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (isAuth) {
@@ -32,11 +30,6 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
         <Header onMenuToggle={() => setMobileMenuOpen(prev => !prev)} />
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-gray-950/50">
           {children}
-          {isDevMode && (
-            <div className="fixed bottom-3 right-3 px-2 py-1 rounded-md bg-amber-950/20 border border-amber-800/20 text-[9px] text-amber-600/50 font-mono pointer-events-none select-none">
-              DEV MODE
-            </div>
-          )}
         </main>
       </div>
     </div>
