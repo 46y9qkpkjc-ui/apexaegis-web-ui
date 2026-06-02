@@ -294,13 +294,22 @@ export default function IdentityProvidersPage() {
   const [newProv, setNewProv] = useState<IdPProvider>({ ...emptyProvider });
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [testing, setTesting] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [list, profiles] = await Promise.all([fetchProviders(), fetchAuthProfiles()]);
-    setProviders(list);
-    setAuthProfiles(profiles);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const [list, profiles] = await Promise.all([fetchProviders(), fetchAuthProfiles()]);
+      setProviders(list);
+      setAuthProfiles(profiles);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load identity providers';
+      setLoadError(message);
+      toast.error('Unable to load identity providers');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -412,6 +421,24 @@ export default function IdentityProvidersPage() {
       {loading && (
         <div className="flex items-center justify-center py-12 text-gray-500">
           <Loader2 size={20} className="animate-spin mr-2" /> Loading providers...
+        </div>
+      )}
+
+      {!loading && loadError && (
+        <div className="rounded-xl border border-red-800/40 bg-red-950/20 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-red-300">Unable to load identity providers</h2>
+              <p className="mt-1 text-sm text-red-200/70">{loadError}</p>
+              <p className="mt-2 text-xs text-red-200/50">Check that the management API is reachable at {apiBaseUrl()} and allows this Web UI origin.</p>
+            </div>
+            <button
+              onClick={load}
+              className="flex items-center gap-2 rounded-lg bg-red-900/40 px-3 py-2 text-sm text-red-100 transition-colors hover:bg-red-800/50"
+            >
+              <RefreshCw size={14} /> Retry
+            </button>
+          </div>
         </div>
       )}
 
