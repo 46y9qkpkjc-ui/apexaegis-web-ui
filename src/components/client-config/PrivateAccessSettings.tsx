@@ -21,7 +21,7 @@ export function PrivateAccessSettingsComponent({ settings, onChange }: Props) {
   const updateField = (path: string, value: any) => {
     const parts = path.split('.');
     const updated = JSON.parse(JSON.stringify(settings));
-    let current = updated;
+    let current: any = updated;
     for (let i = 0; i < parts.length - 1; i++) {
       current = current[parts[i]];
     }

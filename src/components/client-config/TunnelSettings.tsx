@@ -12,8 +12,8 @@ interface TunnelSettingsProps {
 export function TunnelSettingsComponent({ settings, onChange }: TunnelSettingsProps) {
   const updateField = (path: string, value: any) => {
     const parts = path.split('.');
-    const updated = { ...settings };
-    let current = updated;
+    const updated = JSON.parse(JSON.stringify(settings));
+    let current: any = updated;
     for (let i = 0; i < parts.length - 1; i++) {
       current = current[parts[i]];
     }
