@@ -10,8 +10,8 @@ import {
   MonitorSmartphone, Layers, AlertTriangle, ArrowDownToLine,
   Activity, GitBranch, Router, Ghost, Wifi,
   Crosshair, Brain, Fingerprint, Smartphone,
-  Handshake, ChevronRight, ChevronLeft, ShieldCheck, Award, Workflow,
-  ShieldAlert, Search, Cable, ShieldOff,
+  ChevronRight, ChevronLeft, ShieldCheck, Award, Workflow,
+  ShieldAlert, Search, ShieldOff,
 } from 'lucide-react';
 
 interface NavItem {
@@ -120,14 +120,6 @@ const navGroups: NavGroup[] = [
     label: 'Infrastructure',
     items: [
       { href: '/gateways', icon: Server, label: 'Gateway Nodes' },
-      { href: '/gateways/scion-partners', icon: Handshake, label: 'SCION Partner Gateway', featureId: 'scion' },
-      { href: '/infrastructure/sdn', icon: Router, label: 'SDN Switches', featureId: 'sdn-microseg' },
-      { href: '/infrastructure/port-config', icon: Cable, label: 'Port Configuration' },
-      { href: '/infrastructure/dot1x', icon: Fingerprint, label: '802.1X Auth Server', featureId: 'dot1x' },
-      { href: '/infrastructure/wireless', icon: Wifi, label: 'Wireless Management' },
-      { href: '/infrastructure/dynamic-sgt', icon: Layers, label: 'Dynamic SGT' },
-      { href: '/infrastructure/guest-access', icon: Users, label: 'Guest Access' },
-      { href: '/infrastructure/api-integrations', icon: Key, label: 'API Integrations' },
       { href: '/certificates', icon: Lock, label: 'CA Certificates' },
       { href: '/migration', icon: ArrowDownToLine, label: 'Policy Migration' },
       { href: '/settings', icon: Settings, label: 'Settings' },
