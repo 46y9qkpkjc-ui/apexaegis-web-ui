@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
-import { Settings, Save, Globe, Shield, Bell, Users, Server, Key, Clock, Copy, RefreshCw, Package, Plus, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Save, Globe, Shield, Bell, Users, Server, Key, Clock, Copy, RefreshCw, Package, Plus, X, AlertCircle, Loader } from 'lucide-react';
+import * as tokenApi from '@/lib/token-api';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
@@ -42,27 +43,124 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const [deployment, setDeployment] = useState({
-    orgId: '550e8400-e29b-41d4-a716-446655440000',
-    tenantId: '72f988bf-86f1-41af-91ab-2d7cd011db47',
-    userLicenses: 150,
-    usedLicenses: 89,
-  });
+  // Deployment & Token Management State
+  const [deployment, setDeployment] = useState<{
+    orgId: string;
+    tenantId: string;
+    userLicenses: number;
+    usedLicenses: number;
+  } | null>(null);
 
-  const [tokens, setTokens] = useState([
-    { id: 'token_1', name: 'Desktop-Client #1 (Finance Dept)', token: 'apex_abc123xyz789_2024', created: '2026-02-15', lastUsed: '2 hours ago', expiresIn: '89 days' },
-    { id: 'token_2', name: 'Desktop-Client #2 (Engineering)', token: 'apex_def456uvw123_2024', created: '2026-01-20', lastUsed: '1 day ago', expiresIn: '65 days' },
-    { id: 'token_3', name: 'Desktop-Client #3 (HR)', token: 'apex_ghi789rst456_2024', created: '2025-12-10', lastUsed: '5 days ago', expiresIn: '25 days' },
-  ]);
+  const [tokens, setTokens] = useState<Array<{
+    id: string;
+    name: string;
+    token_prefix: string;
+    created_at: string;
+    last_used_at?: string;
+    expires_at: string;
+    status: string;
+  }>>([]);
 
   const [showGenerateToken, setShowGenerateToken] = useState(false);
+  const [tokenName, setTokenName] = useState('');
+  const [isGeneratingToken, setIsGeneratingToken] = useState(false);
+  const [showGeneratedToken, setShowGeneratedToken] = useState<{ token: string; expiresAt: string } | null>(null);
+  const [deploymentLoading, setDeploymentLoading] = useState(true);
+  const [deploymentError, setDeploymentError] = useState<string | null>(null);
 
   const [copied, setCopied] = useState<string | null>(null);
+
+  // Fetch deployment info and tokens on mount
+  useEffect(() => {
+    const loadDeploymentInfo = async () => {
+      try {
+        setDeploymentLoading(true);
+        setDeploymentError(null);
+        const [info, tokenList] = await Promise.all([
+          tokenApi.getDeploymentInfo(),
+          tokenApi.listTokens(),
+        ]);
+
+        setDeployment({
+          orgId: info.org_id,
+          tenantId: info.tenant_id,
+          userLicenses: info.subscription_licenses,
+          usedLicenses: info.licenses_consumed,
+        });
+
+        setTokens(tokenList);
+      } catch (error) {
+        console.error('Failed to load deployment info:', error);
+        setDeploymentError(error instanceof Error ? error.message : 'Failed to load deployment info');
+      } finally {
+        setDeploymentLoading(false);
+      }
+    };
+
+    loadDeploymentInfo();
+  }, []);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopied(label);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleGenerateToken = async () => {
+    if (!tokenName.trim()) {
+      alert('Please enter a token name');
+      return;
+    }
+
+    try {
+      setIsGeneratingToken(true);
+      const result = await tokenApi.generateToken(tokenName);
+      setShowGeneratedToken({ token: result.token, expiresAt: result.expires_at });
+
+      // Reload token list
+      const tokenList = await tokenApi.listTokens();
+      setTokens(tokenList);
+
+      // Reload deployment info to update license counts
+      const info = await tokenApi.getDeploymentInfo();
+      setDeployment({
+        orgId: info.org_id,
+        tenantId: info.tenant_id,
+        userLicenses: info.subscription_licenses,
+        usedLicenses: info.licenses_consumed,
+      });
+
+      setTokenName('');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to generate token');
+    } finally {
+      setIsGeneratingToken(false);
+    }
+  };
+
+  const handleRevokeToken = async (tokenId: string) => {
+    if (!confirm('Are you sure you want to revoke this token? This will release the license back to your pool.')) {
+      return;
+    }
+
+    try {
+      await tokenApi.revokeToken(tokenId);
+
+      // Reload token list
+      const tokenList = await tokenApi.listTokens();
+      setTokens(tokenList);
+
+      // Reload deployment info to update license counts
+      const info = await tokenApi.getDeploymentInfo();
+      setDeployment({
+        orgId: info.org_id,
+        tenantId: info.tenant_id,
+        userLicenses: info.subscription_licenses,
+        usedLicenses: info.licenses_consumed,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to revoke token');
+    }
   };
 
   const tabs = [
@@ -302,120 +400,141 @@ export default function SettingsPage() {
           <div className="space-y-6 max-w-4xl">
             <h3 className="text-sm font-semibold text-gray-300 mb-6">Deployment Configuration</h3>
 
-            {/* Organization Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm text-gray-400">Organization ID</label>
-                  <button
-                    onClick={() => copyToClipboard(deployment.orgId, 'orgId')}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-                      copied === 'orgId'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                  >
-                    <Copy size={14} />
-                    {copied === 'orgId' ? 'Copied!' : 'Copy'}
-                  </button>
+            {/* Loading State */}
+            {deploymentLoading && (
+              <div className="text-center py-12">
+                <Loader className="mx-auto mb-3 text-gray-400 animate-spin" size={32} />
+                <p className="text-sm text-gray-500">Loading deployment information...</p>
+              </div>
+            )}
+
+            {/* Error State */}
+            {deploymentError && (
+              <div className="p-4 bg-red-900/20 border border-red-800/50 rounded-lg flex items-start gap-3">
+                <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
+                <div>
+                  <p className="text-sm font-medium text-red-300">Failed to load deployment info</p>
+                  <p className="text-xs text-red-200 mt-1">{deploymentError}</p>
                 </div>
-                <div className="font-mono text-sm text-blue-400 break-all">{deployment.orgId}</div>
               </div>
+            )}
 
-              <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm text-gray-400">ApexAegis Tenant ID</label>
-                  <button
-                    onClick={() => copyToClipboard(deployment.tenantId, 'tenantId')}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-                      copied === 'tenantId'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                  >
-                    <Copy size={14} />
-                    {copied === 'tenantId' ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-                <div className="font-mono text-sm text-blue-400 break-all">{deployment.tenantId}</div>
-              </div>
-            </div>
-
-            {/* License Usage */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
-                <label className="block text-sm text-gray-400 mb-2">Total User Licenses</label>
-                <div className="text-3xl font-bold text-blue-400">{deployment.userLicenses}</div>
-                <div className="text-xs text-gray-500 mt-1">Subscribed licenses</div>
-              </div>
-              <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
-                <label className="block text-sm text-gray-400 mb-2">Available Licenses</label>
-                <div className="text-3xl font-bold text-green-400">{deployment.userLicenses - deployment.usedLicenses}</div>
-                <div className="text-xs text-gray-500 mt-1">{deployment.usedLicenses} in use by active tokens</div>
-              </div>
-            </div>
-
-            {/* Client Registration Tokens */}
-            <div className="border-t border-gray-800 pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold text-gray-300">Desktop-Client Registration Tokens</h4>
-                <button
-                  onClick={() => setShowGenerateToken(true)}
-                  disabled={deployment.userLicenses - deployment.usedLicenses <= 0}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors"
-                >
-                  <Plus size={14} />
-                  Generate New Token
-                </button>
-              </div>
-
-              {tokens.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="text-sm">No registration tokens generated yet</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {tokens.map(token => (
-                    <div key={token.id} className="p-4 bg-gray-800/20 rounded-lg border border-gray-700/50">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h5 className="text-sm font-medium text-gray-200">{token.name}</h5>
-                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
-                            <div>Created: <span className="text-gray-300">{token.created}</span></div>
-                            <div>Last used: <span className="text-gray-300">{token.lastUsed}</span></div>
-                            <div>Expires: <span className="text-yellow-400">{token.expiresIn}</span></div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setTokens(tokens.filter(t => t.id !== token.id));
-                            setDeployment(prev => ({ ...prev, usedLicenses: prev.usedLicenses - 1 }));
-                          }}
-                          className="flex items-center gap-1 px-2 py-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded text-xs transition-colors"
-                        >
-                          <X size={12} />
-                          Revoke
-                        </button>
-                      </div>
-                      <div className="p-2 bg-gray-900 rounded font-mono text-xs text-gray-400 break-all">
-                        {token.token}
-                      </div>
+            {/* Deployment Info (when loaded) */}
+            {!deploymentLoading && deployment && (
+              <>
+                {/* Organization Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm text-gray-400">Organization ID</label>
+                      <button
+                        onClick={() => copyToClipboard(deployment.orgId, 'orgId')}
+                        className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                          copied === 'orgId'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                      >
+                        <Copy size={14} />
+                        {copied === 'orgId' ? 'Copied!' : 'Copy'}
+                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div className="font-mono text-sm text-blue-400 break-all">{deployment.orgId}</div>
+                  </div>
 
-              <div className="mt-4 p-4 bg-amber-900/20 border border-amber-800/50 rounded-lg">
-                <div className="text-xs text-amber-200">
-                  <strong>⚠️ License Consumption:</strong>
-                  <div className="mt-1 space-y-1">
-                    <div>• Each token generated consumes 1 user license</div>
-                    <div>• Revoking a token releases the license for reuse</div>
-                    <div>• Tokens expire after 1 year of inactivity</div>
+                  <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm text-gray-400">ApexAegis Tenant ID</label>
+                      <button
+                        onClick={() => copyToClipboard(deployment.tenantId, 'tenantId')}
+                        className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                          copied === 'tenantId'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                      >
+                        <Copy size={14} />
+                        {copied === 'tenantId' ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <div className="font-mono text-sm text-blue-400 break-all">{deployment.tenantId}</div>
                   </div>
                 </div>
-              </div>
-            </div>
+
+                {/* License Usage */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
+                    <label className="block text-sm text-gray-400 mb-2">Total User Licenses</label>
+                    <div className="text-3xl font-bold text-blue-400">{deployment.userLicenses}</div>
+                    <div className="text-xs text-gray-500 mt-1">Subscribed licenses</div>
+                  </div>
+                  <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
+                    <label className="block text-sm text-gray-400 mb-2">Available Licenses</label>
+                    <div className="text-3xl font-bold text-green-400">{deployment.userLicenses - deployment.usedLicenses}</div>
+                    <div className="text-xs text-gray-500 mt-1">{deployment.usedLicenses} in use by active tokens</div>
+                  </div>
+                </div>
+
+                {/* Client Registration Tokens */}
+                <div className="border-t border-gray-800 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-semibold text-gray-300">Desktop-Client Registration Tokens</h4>
+                    <button
+                      onClick={() => setShowGenerateToken(true)}
+                      disabled={deployment.userLicenses - deployment.usedLicenses <= 0}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition-colors"
+                    >
+                      <Plus size={14} />
+                      Generate New Token
+                    </button>
+                  </div>
+
+                  {tokens.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">No registration tokens generated yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {tokens.map(token => (
+                        <div key={token.id} className="p-4 bg-gray-800/20 rounded-lg border border-gray-700/50">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <h5 className="text-sm font-medium text-gray-200">{token.name}</h5>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
+                                <div>Created: <span className="text-gray-300">{new Date(token.created_at).toLocaleDateString()}</span></div>
+                                <div>Last used: <span className="text-gray-300">{token.last_used_at ? new Date(token.last_used_at).toLocaleDateString() : 'Never'}</span></div>
+                                <div>Expires: <span className="text-yellow-400">{new Date(token.expires_at).toLocaleDateString()}</span></div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleRevokeToken(token.id)}
+                              className="flex items-center gap-1 px-2 py-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded text-xs transition-colors"
+                            >
+                              <X size={12} />
+                              Revoke
+                            </button>
+                          </div>
+                          <div className="p-2 bg-gray-900 rounded font-mono text-xs text-gray-400 break-all">
+                            {token.token_prefix}••••••••••••••
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mt-4 p-4 bg-amber-900/20 border border-amber-800/50 rounded-lg">
+                    <div className="text-xs text-amber-200">
+                      <strong>⚠️ License Consumption:</strong>
+                      <div className="mt-1 space-y-1">
+                        <div>• Each token generated consumes 1 user license</div>
+                        <div>• Revoking a token releases the license for reuse</div>
+                        <div>• Tokens expire after 1 year from creation</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -473,57 +592,112 @@ export default function SettingsPage() {
       </div>
 
       {/* Generate Token Modal */}
-      {showGenerateToken && (
+      {(showGenerateToken || showGeneratedToken) && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowGenerateToken(false)} />
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => { setShowGenerateToken(false); setShowGeneratedToken(null); }} />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Generate New Registration Token</h3>
-              <button onClick={() => setShowGenerateToken(false)} className="text-gray-500 hover:text-gray-300">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Desktop-Client Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Desktop-Client #4 (Marketing Dept)"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500/50"
-                />
-              </div>
-              <div className="p-3 bg-blue-900/20 border border-blue-800/50 rounded-lg">
-                <div className="text-xs text-blue-200">
-                  <strong>License Impact:</strong> Generating a token will consume 1 of your {deployment.userLicenses - deployment.usedLicenses} remaining licenses.
+            {/* Generate Token Form */}
+            {showGenerateToken && !showGeneratedToken && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Generate New Registration Token</h3>
+                  <button onClick={() => setShowGenerateToken(false)} className="text-gray-500 hover:text-gray-300">
+                    <X size={18} />
+                  </button>
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowGenerateToken(false)}
-                  className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    const newToken = {
-                      id: `token_${tokens.length + 1}`,
-                      name: 'New Desktop-Client',
-                      token: `apex_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}_2024`,
-                      created: new Date().toISOString().split('T')[0],
-                      lastUsed: 'Never',
-                      expiresIn: '365 days',
-                    };
-                    setTokens([...tokens, newToken]);
-                    setDeployment(prev => ({ ...prev, usedLicenses: prev.usedLicenses + 1 }));
-                    setShowGenerateToken(false);
-                  }}
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Generate Token
-                </button>
-              </div>
-            </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Desktop-Client Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Desktop-Client #4 (Marketing Dept)"
+                      value={tokenName}
+                      onChange={e => setTokenName(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500/50"
+                    />
+                  </div>
+                  <div className="p-3 bg-blue-900/20 border border-blue-800/50 rounded-lg">
+                    <div className="text-xs text-blue-200">
+                      <strong>License Impact:</strong> Generating a token will consume 1 of your {deployment ? deployment.userLicenses - deployment.usedLicenses : 0} remaining licenses.
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowGenerateToken(false)}
+                      disabled={isGeneratingToken}
+                      className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800 disabled:cursor-not-allowed rounded-lg text-sm transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleGenerateToken}
+                      disabled={isGeneratingToken}
+                      className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {isGeneratingToken && <Loader size={14} className="animate-spin" />}
+                      {isGeneratingToken ? 'Generating...' : 'Generate Token'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Generated Token Display */}
+            {showGeneratedToken && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Token Generated Successfully ✓</h3>
+                  <button onClick={() => { setShowGenerateToken(false); setShowGeneratedToken(null); }} className="text-gray-500 hover:text-gray-300">
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div className="p-4 bg-green-900/20 border border-green-800/50 rounded-lg">
+                    <p className="text-sm text-green-200">Your token has been generated and is ready to use. <strong>Copy it now</strong> — it will not be shown again!</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Your Token</label>
+                    <div className="relative">
+                      <div className="font-mono text-sm bg-gray-900 p-3 rounded border border-gray-700 break-all pr-12 text-gray-300">
+                        {showGeneratedToken.token}
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(showGeneratedToken.token, 'generatedToken')}
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                          copied === 'generatedToken'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                      >
+                        <Copy size={14} />
+                        {copied === 'generatedToken' ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Expires</label>
+                    <div className="text-sm text-gray-300 py-2">
+                      {new Date(showGeneratedToken.expiresAt).toLocaleDateString()} at {new Date(showGeneratedToken.expiresAt).toLocaleTimeString()}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-amber-900/20 border border-amber-800/50 rounded-lg">
+                    <p className="text-xs text-amber-200">
+                      <strong>⚠️ Important:</strong> Share this token with your desktop-client team member. Once you close this window, you won't be able to view it again.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => { setShowGenerateToken(false); setShowGeneratedToken(null); }}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
