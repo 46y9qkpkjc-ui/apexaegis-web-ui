@@ -32,6 +32,7 @@ interface IdPProvider {
   // SCIM
   scim_enabled: boolean;
   scim_endpoint: string;
+  scim_token?: string;
   // Mapping
   attribute_map: Record<string, string>;
   group_map: Record<string, string>;
@@ -53,12 +54,19 @@ interface AuthProfile {
   contractor_access: boolean;
 }
 
+const appOrigin = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return 'https://api.apexaegis.app';
+};
+
 const emptyProvider: IdPProvider = {
   id: '', name: '', provider_type: 'okta', enabled: true, is_default: false,
   client_id: '', issuer_url: '', client_secret: '', jwks_uri: '', token_endpoint: '', scopes: ['openid', 'profile', 'email', 'groups'],
   saml_entity_id: '', saml_sso_url: '', saml_certificate: '',
   kerberos_enabled: false, kerberos_realm: '',
-  scim_enabled: false, scim_endpoint: '',
+  scim_enabled: false, scim_endpoint: `${appOrigin()}/scim/v2`, scim_token: '',
   attribute_map: { sub: 'user_id', email: 'email', name: 'display_name', groups: 'groups' },
   group_map: {},
 };
@@ -201,26 +209,75 @@ function OidcFields({ prov, onChange, showSecrets, toggleSecret, copyToClipboard
         <p className="text-[11px] text-blue-400/80">
           <strong>Redirect URI</strong> — configure this in your Okta/Azure AD application:
         </p>
-        <code className="text-[11px] text-blue-300 font-mono block mt-1">{`${globalThis.location.origin}/api/v1/auth/sso/callback`}</code>
+        <code className="text-[11px] text-blue-300 font-mono block mt-1">{`${appOrigin()}/api/v1/auth/sso/callback`}</code>
       </div>
     </div>
   );
 }
 
-function ProvisioningFields({ prov, onChange }: Readonly<{ prov: IdPProvider; onChange: (p: IdPProvider) => void }>) {
+function ProvisioningFields({ prov, onChange, showSecrets, toggleSecret, copyToClipboard }: Readonly<{
+  prov: IdPProvider;
+  onChange: (p: IdPProvider) => void;
+  showSecrets: Record<string, boolean>;
+  toggleSecret: (f: string) => void;
+  copyToClipboard: (t: string) => void;
+}>) {
+  const scimEndpoint = prov.scim_endpoint || `${appOrigin()}/scim/v2`;
+
   return (
     <div className="space-y-3 border-t border-gray-800 pt-3 mt-3">
-      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Provisioning</h4>
+      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">SCIM Provisioning</h4>
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-sm text-gray-400">Auto-provision users on first SSO login</span>
-          <p className="text-[11px] text-gray-600">New users will be created with read-only role</p>
+          <span className="text-sm text-gray-400">Enable Okta SCIM user and group provisioning</span>
+          <p className="text-[11px] text-gray-600">Okta pushes users and groups into ApexAegis for admin, desktop SSO, and access workflows</p>
         </div>
         <button onClick={() => onChange({ ...prov, scim_enabled: !prov.scim_enabled })}
           className={`w-8 h-4 rounded-full transition-colors relative ${prov.scim_enabled ? 'bg-green-600' : 'bg-gray-700'}`}>
           <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${prov.scim_enabled ? 'left-4' : 'left-0.5'}`} />
         </button>
       </div>
+      {prov.scim_enabled && (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">SCIM Base URL</label>
+            <div className="flex gap-1.5">
+              <input
+                value={scimEndpoint}
+                onChange={e => onChange({ ...prov, scim_endpoint: e.target.value })}
+                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-500/50"
+              />
+              <button onClick={() => copyToClipboard(scimEndpoint)} className="p-2 text-gray-500 hover:text-gray-300"><Copy size={14} /></button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">SCIM Bearer Token</label>
+            <div className="flex gap-1.5">
+              <input
+                type={showSecrets.scimToken ? 'text' : 'password'}
+                value={prov.scim_token ?? ''}
+                onChange={e => onChange({ ...prov, scim_token: e.target.value })}
+                placeholder={prov.id ? 'Leave blank to keep existing token' : 'Paste a high-entropy token for Okta'}
+                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500/50"
+              />
+              <button onClick={() => toggleSecret('scimToken')} className="p-2 text-gray-500 hover:text-gray-300">
+                {showSecrets.scimToken ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-600 mt-1">Stored as a hash in CockroachDB. Okta uses this as HTTP Header bearer authentication.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3 bg-gray-800/30 rounded-lg">
+              <div className="text-xs text-gray-500 mb-1">Okta Unique Identifier</div>
+              <code className="text-xs text-gray-300">userName</code>
+            </div>
+            <div className="p-3 bg-gray-800/30 rounded-lg">
+              <div className="text-xs text-gray-500 mb-1">Supported Push</div>
+              <span className="text-xs text-gray-300">Users, AdminUsers, Groups</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -587,7 +644,7 @@ export default function IdentityProvidersPage() {
                 </div>
               </div>
               <OidcFields prov={editProvider} onChange={setEditProvider} showSecrets={showSecrets} toggleSecret={toggleSecret} copyToClipboard={copyToClipboard} />
-              <ProvisioningFields prov={editProvider} onChange={setEditProvider} />
+              <ProvisioningFields prov={editProvider} onChange={setEditProvider} showSecrets={showSecrets} toggleSecret={toggleSecret} copyToClipboard={copyToClipboard} />
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setEditProvider(null)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">Cancel</button>
@@ -633,7 +690,7 @@ export default function IdentityProvidersPage() {
                 </div>
               </div>
               <OidcFields prov={newProv} onChange={setNewProv} showSecrets={showSecrets} toggleSecret={toggleSecret} copyToClipboard={copyToClipboard} />
-              <ProvisioningFields prov={newProv} onChange={setNewProv} />
+              <ProvisioningFields prov={newProv} onChange={setNewProv} showSecrets={showSecrets} toggleSecret={toggleSecret} copyToClipboard={copyToClipboard} />
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setShowCreate(false)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">Cancel</button>
