@@ -1,0 +1,128 @@
+// Client Configuration API Client
+export type ClientGroupConfig = any; // Import from page component
+
+/**
+ * Fetch client configuration for a specific group
+ */
+export async function getClientConfig(groupId: string): Promise<ClientGroupConfig> {
+  const response = await fetch(`/api/v1/admin/client-config/${groupId}`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch client config: HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Save/update client configuration for a group
+ */
+export async function saveClientConfig(groupId: string, config: ClientGroupConfig): Promise<ClientGroupConfig> {
+  const response = await fetch(`/api/v1/admin/client-config/${groupId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(config),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to save config' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * List all client configurations for the organization
+ */
+export async function listClientConfigs(): Promise<ClientGroupConfig[]> {
+  const response = await fetch(`/api/v1/admin/client-config`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch client configs: HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Create a new client configuration group
+ */
+export async function createClientConfig(config: ClientGroupConfig): Promise<ClientGroupConfig> {
+  const response = await fetch(`/api/v1/admin/client-config`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(config),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to create config' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Fetch audit logs for client configuration changes
+ */
+export async function getClientConfigAuditLogs(
+  groupId?: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (groupId) params.append('group_id', groupId);
+  params.append('limit', limit.toString());
+  params.append('offset', offset.toString());
+
+  const response = await fetch(`/api/v1/admin/client-config/audit-logs?${params.toString()}`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch audit logs: HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Validate client configuration before saving
+ */
+export async function validateClientConfig(config: ClientGroupConfig): Promise<{ valid: boolean; errors: string[] }> {
+  const response = await fetch(`/api/v1/admin/client-config/validate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(config),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Validation failed: HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Delete a client configuration group
+ */
+export async function deleteClientConfig(groupId: string): Promise<void> {
+  const response = await fetch(`/api/v1/admin/client-config/${groupId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete config: HTTP ${response.status}`);
+  }
+}
