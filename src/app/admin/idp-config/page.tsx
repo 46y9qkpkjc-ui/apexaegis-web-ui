@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Key, Shield, Upload, Download, RefreshCw, CheckCircle, XCircle, X, Eye, EyeOff, Copy, Plus } from 'lucide-react';
+import { Key, Shield, Upload, Download, RefreshCw, CheckCircle, XCircle, X, Eye, EyeOff, Copy, Plus, Loader } from 'lucide-react';
+import { testIdPConnection, type TestConnectionResponse, formatDiagnostics, getTestResultMessage } from '@/lib/idp-test-api';
 
 type IdpType = 'saml' | 'oidc' | 'ldap' | 'radius';
 
@@ -123,6 +124,10 @@ export default function IdpConfigurationPage() {
   const [selectedConfig, setSelectedConfig] = useState<string | null>(null);
   const [editConfig, setEditConfig] = useState<IdpConfig | null>(null);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const [testingIdpId, setTestingIdpId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<TestConnectionResponse | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [showTestModal, setShowTestModal] = useState(false);
 
   const selected = configs.find(c => c.id === selectedConfig);
 
@@ -134,8 +139,33 @@ export default function IdpConfigurationPage() {
     setConfigs(prev => prev.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c));
   };
 
-  const handleTestConnection = (id: string) => {
-    setConfigs(prev => prev.map(c => c.id === id ? { ...c, lastTestResult: 'success' } : c));
+  const handleTestConnection = async (id: string) => {
+    setTestingIdpId(id);
+    setTestError(null);
+    setTestResult(null);
+    setShowTestModal(true);
+
+    try {
+      const response = await testIdPConnection(id, 'full');
+      setTestResult(response);
+
+      // Update lastTestResult based on success
+      setConfigs(prev => prev.map(c =>
+        c.id === id
+          ? { ...c, lastTestResult: response.success ? 'success' : 'failed' }
+          : c
+      ));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setTestError(errorMessage);
+      setConfigs(prev => prev.map(c =>
+        c.id === id
+          ? { ...c, lastTestResult: 'failed' }
+          : c
+      ));
+    } finally {
+      setTestingIdpId(null);
+    }
   };
 
   const handleSave = () => {
@@ -435,6 +465,16 @@ export default function IdpConfigurationPage() {
                   <div>
                     <label className="block text-sm text-gray-400 mb-1">Discovery URL</label>
                     <input value={editConfig.oidcDiscoveryUrl || ''} onChange={e => setEditConfig({ ...editConfig, oidcDiscoveryUrl: e.target.value })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono focus:outline-none focus:border-blue-500/50" />
+                    {editConfig.name?.toLowerCase().includes('entra') && (
+                      <div className="mt-2 p-3 bg-blue-900/20 border border-blue-800/30 rounded text-xs text-blue-200">
+                        <strong>📋 For Entra ID:</strong>
+                        <div className="mt-1 space-y-1">
+                          <div>• Format: <code className="bg-gray-800 px-1 rounded">https://login.microsoftonline.com/{'{'}YOUR_TENANT_ID{'}'}/v2.0/.well-known/openid-configuration</code></div>
+                          <div>• Replace <strong>{'{'}YOUR_TENANT_ID{'}'}</strong> with your Directory (Tenant) ID from Azure Portal</div>
+                          <div>• Find it at: Azure AD → App Registrations → Your App → Overview → "Directory (tenant) ID"</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm text-gray-400 mb-1">Scopes (comma-separated)</label>
@@ -489,6 +529,119 @@ export default function IdpConfigurationPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Test Connection Modal */}
+      {showTestModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg max-w-lg w-full p-6">
+            {testingIdpId && !testResult && !testError ? (
+              <div className="flex flex-col items-center gap-4">
+                <Loader size={32} className="animate-spin text-blue-500" />
+                <p className="text-gray-300 text-center">Testing connection to IdP...</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">
+                    Test Connection Result
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowTestModal(false);
+                      setTestResult(null);
+                      setTestError(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-300"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {testError ? (
+                  <div className="bg-red-900/30 border border-red-800 rounded-lg p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                      <XCircle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-red-400">Connection Failed</p>
+                        <p className="text-sm text-red-300 mt-1">{testError}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : testResult ? (
+                  <>
+                    <div
+                      className={`${
+                        testResult.success
+                          ? 'bg-green-900/30 border-green-800'
+                          : 'bg-red-900/30 border-red-800'
+                      } border rounded-lg p-4 mb-4`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {testResult.success ? (
+                          <CheckCircle size={20} className="text-green-500 mt-0.5 flex-shrink-0" />
+                        ) : (
+                          <XCircle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        )}
+                        <div>
+                          <p
+                            className={`font-semibold ${
+                              testResult.success ? 'text-green-400' : 'text-red-400'
+                            }`}
+                          >
+                            {getTestResultMessage(testResult)}
+                          </p>
+                          {testResult.provider_name && (
+                            <p className="text-sm text-gray-400 mt-1">
+                              Provider: {testResult.provider_name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {testResult.diagnostics && Object.keys(testResult.diagnostics).length > 0 && (
+                      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-4">
+                        <p className="text-sm font-semibold text-gray-300 mb-2">
+                          Diagnostic Information
+                        </p>
+                        <div className="space-y-1">
+                          {formatDiagnostics(testResult.diagnostics).map((line, idx) => (
+                            <p key={idx} className="text-xs text-gray-400 font-mono">
+                              {line}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {testResult.error_message && (
+                      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-4">
+                        <p className="text-sm font-semibold text-gray-300 mb-2">
+                          Error Details
+                        </p>
+                        <p className="text-xs text-gray-400 break-words">
+                          {testResult.error_message}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : null}
+
+                <button
+                  onClick={() => {
+                    setShowTestModal(false);
+                    setTestResult(null);
+                    setTestError(null);
+                  }}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
