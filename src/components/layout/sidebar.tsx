@@ -9,7 +9,7 @@ import {
   Settings, BarChart3, Network, Lock, Bug,
   MonitorSmartphone, Layers, AlertTriangle, ArrowDownToLine,
   Activity, GitBranch, Router, Ghost, Wifi,
-  Crosshair, Brain, Fingerprint, Smartphone,
+  Crosshair, Brain, Smartphone,
   ChevronRight, ChevronLeft, ShieldCheck, Award, Workflow,
   ShieldAlert, Search, ShieldOff,
 } from 'lucide-react';
@@ -83,7 +83,6 @@ const navGroups: NavGroup[] = [
       { href: '/identity/users', icon: Users, label: 'Users & Groups' },
       { href: '/identity/devices', icon: MonitorSmartphone, label: 'Devices' },
       { href: '/identity/providers', icon: Key, label: 'Identity Providers' },
-      { href: '/admin/passkeys', icon: Fingerprint, label: 'Passkey Manager' },
       { href: '/admin/abac', icon: Shield, label: 'ABAC Control' },
       { href: '/admin/oauth-api', icon: Key, label: 'OAuth 2.0 & API Keys' },
       { href: '/admin/idp-config', icon: Settings, label: 'IdP Configuration' },

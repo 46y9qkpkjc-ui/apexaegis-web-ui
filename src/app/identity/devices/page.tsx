@@ -1,6 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { MonitorSmartphone, Search, Shield, ShieldAlert, ShieldCheck, Laptop, Smartphone, Tablet, Pencil, X, Plus, Eye, FileCheck, Bug, Key, HardDrive, CheckCircle, XCircle } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
+import { useAuthStore } from '@/lib/auth-store';
 
 /* ── Types ── */
 interface Device {
@@ -21,6 +23,24 @@ interface Device {
   avRunning: boolean;
   postureProfile: string;
   registeredAt: string;
+}
+
+interface ApiDevice {
+  id: string;
+  device_id: string;
+  device_name?: string;
+  device_type?: string;
+  os_type?: string;
+  os_version?: string;
+  client_version?: string;
+  user_name?: string;
+  user_email?: string;
+  compliance_status?: string;
+  status?: string;
+  registered_via?: string;
+  mtls_cert_not_after?: string;
+  last_seen?: string;
+  created_at?: string;
 }
 
 interface PostureProfile {
@@ -92,8 +112,57 @@ const eventBadge: Record<string, { label: string; color: string }> = {
 
 const typeIcon: Record<string, typeof Laptop> = { laptop: Laptop, mobile: Smartphone, tablet: Tablet };
 
+function formatTime(value?: string): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function normalizeCompliance(value?: string): Device['compliance'] {
+  if (value === 'compliant') return 'compliant';
+  if (value === 'non_compliant' || value === 'non-compliant') return 'non-compliant';
+  return 'unknown';
+}
+
+function normalizeDeviceType(value?: string, os?: string): Device['type'] {
+  if (value === 'mobile' || value === 'tablet' || value === 'laptop') return value;
+  const normalizedOS = (os || '').toLowerCase();
+  if (normalizedOS === 'ios' || normalizedOS === 'android') return 'mobile';
+  return 'laptop';
+}
+
+function certIsValid(notAfter?: string): boolean {
+  if (!notAfter) return false;
+  const date = new Date(notAfter);
+  return !Number.isNaN(date.getTime()) && date.getTime() > Date.now();
+}
+
+function mapApiDevice(device: ApiDevice): Device {
+  const os = [device.os_type, device.os_version].filter(Boolean).join(' ') || 'Unknown OS';
+  return {
+    id: device.id,
+    name: device.device_name || device.device_id,
+    type: normalizeDeviceType(device.device_type, device.os_type),
+    os,
+    user: device.user_email || device.user_name || device.device_id,
+    compliance: normalizeCompliance(device.compliance_status),
+    agentVersion: device.client_version || '—',
+    lastSeen: formatTime(device.last_seen),
+    enrolled: device.status === 'active',
+    encrypted: false,
+    firewallOn: false,
+    certValid: certIsValid(device.mtls_cert_not_after),
+    avProcess: '—',
+    avVersion: '—',
+    avRunning: false,
+    postureProfile: 'Default',
+    registeredAt: formatTime(device.created_at),
+  };
+}
+
 export default function DevicesPage() {
-  const [devices, setDevices] = useState<Device[]>(demoDevices);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [postureProfiles, setPostureProfiles] = useState<PostureProfile[]>(demoPostureProfiles);
   const [tab, setTab] = useState<'devices' | 'posture' | 'log'>('devices');
   const [search, setSearch] = useState('');
@@ -101,10 +170,36 @@ export default function DevicesPage() {
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [editPosture, setEditPosture] = useState<PostureProfile | null>(null);
   const [viewPosture, setViewPosture] = useState<PostureProfile | null>(null);
+  const [loadingDevices, setLoadingDevices] = useState(true);
+  const [deviceError, setDeviceError] = useState<string | null>(null);
+
+  const loadDevices = useCallback(async () => {
+    setLoadingDevices(true);
+    setDeviceError(null);
+    try {
+      const token = useAuthStore.getState().accessToken;
+      const res = await fetch(apiUrl('/api/v1/devices'), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`Device inventory rejected: HTTP ${res.status}`);
+      const data = await res.json();
+      setDevices((data.devices ?? []).map(mapApiDevice));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load registered devices';
+      setDeviceError(message);
+      setDevices([]);
+    } finally {
+      setLoadingDevices(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDevices();
+  }, [loadDevices]);
 
   const filtered = devices.filter(d => {
     const s = search.toLowerCase();
-    const matchSearch = d.name.toLowerCase().includes(s) || d.user.toLowerCase().includes(s) || d.os.toLowerCase().includes(s);
+    const matchSearch = d.name.toLowerCase().includes(s) || d.user.toLowerCase().includes(s) || d.os.toLowerCase().includes(s) || d.id.toLowerCase().includes(s);
     const matchFilter = filter === 'all' || d.compliance === filter;
     return matchSearch && matchFilter;
   });
@@ -136,7 +231,7 @@ export default function DevicesPage() {
           <MonitorSmartphone size={24} className="text-cyan-400" />
           <div>
             <h1 className="text-xl font-semibold">Devices</h1>
-            <p className="text-sm text-gray-500">Endpoint inventory, compliance posture, and registered client log</p>
+            <p className="text-sm text-gray-500">mTLS registered endpoints, compliance posture, and registered client log</p>
           </div>
         </div>
       </div>
@@ -162,7 +257,7 @@ export default function DevicesPage() {
         {(['devices', 'posture', 'log'] as const).map(t => (
           <button key={t} onClick={() => { setTab(t); setSearch(''); setFilter('all'); }}
             className={`pb-2 text-sm font-medium transition-colors capitalize ${tab === t ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
-            {t === 'devices' ? 'Registered Clients' : t === 'posture' ? 'Device Posture Profiles' : 'Client Event Log'}
+            {t === 'devices' ? 'Registered Devices' : t === 'posture' ? 'Device Posture Profiles' : 'Client Event Log'}
           </button>
         ))}
       </div>
@@ -173,7 +268,7 @@ export default function DevicesPage() {
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by device name, user, or OS..."
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by device name, authenticated user, device ID, or OS..."
                 className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm focus:outline-none focus:border-blue-600" />
             </div>
             <select value={filter} onChange={e => setFilter(e.target.value as typeof filter)}
@@ -185,13 +280,21 @@ export default function DevicesPage() {
             </select>
           </div>
 
+          {deviceError && (
+            <div className="rounded-xl border border-red-800/40 bg-red-950/20 p-4 text-sm text-red-200">
+              <div className="font-medium">Unable to load registered devices</div>
+              <div className="mt-1 text-red-200/70">{deviceError}</div>
+              <button onClick={loadDevices} className="mt-3 rounded-lg bg-red-900/40 px-3 py-1.5 text-xs hover:bg-red-800/50">Retry</button>
+            </div>
+          )}
+
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-800 text-left text-xs text-gray-500 uppercase">
                   <th className="px-4 py-3">Device</th>
                   <th className="px-4 py-3">OS</th>
-                  <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">User / Device ID</th>
                   <th className="px-4 py-3">Compliance</th>
                   <th className="px-4 py-3">Posture Profile</th>
                   <th className="px-4 py-3">AV</th>
@@ -203,7 +306,12 @@ export default function DevicesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(device => {
+                {loadingDevices && (
+                  <tr>
+                    <td colSpan={11} className="px-4 py-10 text-center text-sm text-gray-500">Loading registered devices...</td>
+                  </tr>
+                )}
+                {!loadingDevices && filtered.map(device => {
                   const DeviceIcon = typeIcon[device.type];
                   const badge = complianceBadge[device.compliance];
                   const BadgeIcon = badge.Icon;
@@ -247,6 +355,13 @@ export default function DevicesPage() {
                     </tr>
                   );
                 })}
+                {!loadingDevices && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={11} className="px-4 py-10 text-center text-sm text-gray-500">
+                      No mTLS registered devices found. Devices will appear here after certificate-based registration.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
