@@ -73,7 +73,7 @@ const demoConfigs: IdpConfig[] = [
     lastTestResult: 'success',
   },
   {
-    id: '2', name: 'Azure AD', type: 'oidc', enabled: true,
+    id: '2', name: 'Entra ID', type: 'oidc', enabled: true,
     oidcClientId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     oidcClientSecret: '••••••••••••••••••••••••••••••',
     oidcDiscoveryUrl: 'https://login.microsoftonline.com/tenant-id/v2.0/.well-known/openid-configuration',
@@ -322,6 +322,13 @@ export default function IdpConfigurationPage() {
               {/* Common settings */}
               <div className="space-y-4 border-t border-gray-800 pt-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Common Settings</h3>
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  <div className="p-3 bg-gray-800/30 rounded-lg">
+                    <div className="text-xs text-gray-500 mb-1">Organization ID</div>
+                    <div className="font-mono text-sm text-blue-400 break-all">550e8400-e29b-41d4-a716-446655440000</div>
+                    <div className="text-xs text-gray-600 mt-1">Used for desktop-client registration</div>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
                     <span className="text-gray-400">MFA Enforced</span>
