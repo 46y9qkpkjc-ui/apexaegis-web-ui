@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Key, Plus, Pencil, Trash2, CheckCircle, XCircle, RefreshCw, X, Eye, EyeOff, Loader2, ExternalLink,
   Shield, Globe, Users, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiBaseUrl, apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -55,10 +56,7 @@ interface AuthProfile {
 }
 
 const appOrigin = () => {
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
-  }
-  return 'https://api.apexaegis.app';
+  return apiBaseUrl() || 'https://api.apexaegis.app';
 };
 
 const emptyProvider: IdPProvider = {
@@ -94,21 +92,21 @@ function normalizeProvider(p: Partial<IdPProvider>): IdPProvider {
 }
 
 async function fetchProviders(): Promise<IdPProvider[]> {
-  const res = await fetch('/api/v1/identity/providers', { headers: headers() });
+  const res = await fetch(apiUrl('/api/v1/identity/providers'), { headers: headers() });
   if (!res.ok) return [];
   const data = await res.json();
   return (data.identity_providers ?? []).map(normalizeProvider);
 }
 
 async function fetchAuthProfiles(): Promise<AuthProfile[]> {
-  const res = await fetch('/api/v1/identity/auth-profiles', { headers: headers() });
+  const res = await fetch(apiUrl('/api/v1/identity/auth-profiles'), { headers: headers() });
   if (!res.ok) return [];
   const data = await res.json();
   return data.auth_profiles ?? [];
 }
 
 async function updateAuthProfiles(profiles: AuthProfile[]): Promise<AuthProfile[] | null> {
-  const res = await fetch('/api/v1/identity/auth-profiles', {
+  const res = await fetch(apiUrl('/api/v1/identity/auth-profiles'), {
     method: 'PUT',
     headers: headers(),
     body: JSON.stringify({ auth_profiles: profiles }),
@@ -119,19 +117,19 @@ async function updateAuthProfiles(profiles: AuthProfile[]): Promise<AuthProfile[
 }
 
 async function createProvider(p: Partial<IdPProvider>): Promise<string | null> {
-  const res = await fetch('/api/v1/identity/providers', { method: 'POST', headers: headers(), body: JSON.stringify(p) });
+  const res = await fetch(apiUrl('/api/v1/identity/providers'), { method: 'POST', headers: headers(), body: JSON.stringify(p) });
   if (!res.ok) return null;
   const data = await res.json();
   return data.id ?? null;
 }
 
 async function updateProvider(p: IdPProvider): Promise<boolean> {
-  const res = await fetch(`/api/v1/identity/providers/${p.id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(p) });
+  const res = await fetch(apiUrl(`/api/v1/identity/providers/${p.id}`), { method: 'PUT', headers: headers(), body: JSON.stringify(p) });
   return res.ok;
 }
 
 async function deleteProvider(id: string): Promise<boolean> {
-  const res = await fetch(`/api/v1/identity/providers/${id}`, { method: 'DELETE', headers: headers() });
+  const res = await fetch(apiUrl(`/api/v1/identity/providers/${id}`), { method: 'DELETE', headers: headers() });
   return res.ok;
 }
 

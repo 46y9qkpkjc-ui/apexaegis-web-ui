@@ -1,4 +1,5 @@
 // IdP Configuration API Client
+import { apiUrl } from './api-url';
 
 export interface IdPConfig {
   id?: string;
@@ -33,7 +34,7 @@ export interface IdPResponse {
  * Create a new IdP configuration
  */
 export async function createIdP(config: IdPConfig): Promise<IdPResponse> {
-  const response = await fetch('/api/v1/identity/providers', {
+  const response = await fetch(apiUrl('/api/v1/identity/providers'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -53,7 +54,7 @@ export async function createIdP(config: IdPConfig): Promise<IdPResponse> {
  * Update an existing IdP configuration
  */
 export async function updateIdP(id: string, config: IdPConfig): Promise<IdPResponse> {
-  const response = await fetch(`/api/v1/identity/providers/${id}`, {
+  const response = await fetch(apiUrl(`/api/v1/identity/providers/${id}`), {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -73,7 +74,7 @@ export async function updateIdP(id: string, config: IdPConfig): Promise<IdPRespo
  * Get a specific IdP configuration
  */
 export async function getIdP(id: string): Promise<IdPResponse> {
-  const response = await fetch(`/api/v1/identity/providers/${id}`, {
+  const response = await fetch(apiUrl(`/api/v1/identity/providers/${id}`), {
     method: 'GET',
   });
 
@@ -88,7 +89,7 @@ export async function getIdP(id: string): Promise<IdPResponse> {
  * List all IdP configurations for the organization
  */
 export async function listIdPs(): Promise<IdPResponse[]> {
-  const response = await fetch('/api/v1/identity/providers', {
+  const response = await fetch(apiUrl('/api/v1/identity/providers'), {
     method: 'GET',
   });
 
@@ -103,7 +104,7 @@ export async function listIdPs(): Promise<IdPResponse[]> {
  * Delete an IdP configuration
  */
 export async function deleteIdP(id: string): Promise<void> {
-  const response = await fetch(`/api/v1/identity/providers/${id}`, {
+  const response = await fetch(apiUrl(`/api/v1/identity/providers/${id}`), {
     method: 'DELETE',
   });
 

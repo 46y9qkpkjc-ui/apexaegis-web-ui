@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
-const API_BACKEND_URL = process.env.API_BACKEND_URL || 'http://localhost:9090';
+const API_BACKEND_URL =
+  process.env.API_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://api.apexaegis.app' : 'http://localhost:9090');
 
 const nextConfig = {
   reactStrictMode: true,
