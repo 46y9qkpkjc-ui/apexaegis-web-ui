@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, Pencil, Trash2, Search, Shield, UserCheck, UserX, X } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
 
 interface User {
@@ -34,17 +35,16 @@ interface Group {
   name: string;
   memberCount: number;
   description: string;
+  source: string;
 }
 
-const initGroups: Group[] = [
-  { id: 'g1', name: 'Engineering', memberCount: 0, description: 'Engineering team members' },
-  { id: 'g2', name: 'Marketing', memberCount: 0, description: 'Marketing team' },
-  { id: 'g3', name: 'Security', memberCount: 0, description: 'Security & compliance team' },
-  { id: 'g4', name: 'Finance', memberCount: 0, description: 'Finance department' },
-  { id: 'g5', name: 'VPN-Users', memberCount: 0, description: 'Users authorized for remote VPN access' },
-];
-
-const allGroupNames = ['Engineering', 'Marketing', 'Security', 'Finance', 'VPN-Users'];
+interface ApiGroup {
+  id: string;
+  display_name: string;
+  external_id?: string;
+  source?: string;
+  members?: string[];
+}
 
 const statusBadge: Record<string, { label: string; color: string }> = {
   active: { label: 'Active', color: 'bg-green-900/40 text-green-400 border-green-800' },
@@ -93,19 +93,20 @@ export default function UsersGroupsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [clientUsers, setClientUsers] = useState<ClientUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [groups, setGroups] = useState<Group[]>(initGroups);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editGroup, setEditGroup] = useState<Group | null>(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newUser, setNewUser] = useState<User>({ id: '', name: '', email: '', role: 'user', groups: [], status: 'active', mfa_enabled: false, last_login_at: null, oauth_provider: '', created_at: null });
-  const [newGroup, setNewGroup] = useState<Group>({ id: '', name: '', memberCount: 0, description: '' });
+  const [newGroup, setNewGroup] = useState<Group>({ id: '', name: '', memberCount: 0, description: '', source: 'local' });
 
   const fetchUsers = useCallback(async () => {
     try {
-      const [admRes, clRes] = await Promise.all([
-        fetch('/api/v1/users', { headers: getAuthHeaders() }),
-        fetch('/api/v1/client-users', { headers: getAuthHeaders() }),
+      const [admRes, clRes, groupRes] = await Promise.all([
+        fetch(apiUrl('/api/v1/users'), { headers: getAuthHeaders() }),
+        fetch(apiUrl('/api/v1/client-users'), { headers: getAuthHeaders() }),
+        fetch(apiUrl('/api/v1/groups'), { headers: getAuthHeaders() }),
       ]);
       if (admRes.ok) {
         const data = await admRes.json();
@@ -114,6 +115,16 @@ export default function UsersGroupsPage() {
       if (clRes.ok) {
         const data = await clRes.json();
         setClientUsers(data);
+      }
+      if (groupRes.ok) {
+        const data = await groupRes.json();
+        setGroups((data.groups ?? []).map((group: ApiGroup) => ({
+          id: group.id,
+          name: group.display_name,
+          memberCount: group.members?.length ?? 0,
+          description: group.source === 'scim' ? 'Provisioned and managed by your identity provider' : 'Locally managed group',
+          source: group.source || 'local',
+        })));
       }
     } catch { /* silent */ }
     setLoading(false);
@@ -142,7 +153,7 @@ export default function UsersGroupsPage() {
   const saveUser = async () => {
     if (!editUser) return;
     try {
-      const res = await fetch(`/api/v1/users/${editUser.id}`, {
+      const res = await fetch(apiUrl(`/api/v1/users/${editUser.id}`), {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ name: editUser.name, role: editUser.role, status: editUser.status, mfa_enabled: editUser.mfa_enabled }),
@@ -154,9 +165,16 @@ export default function UsersGroupsPage() {
     setEditUser(null);
   };
 
-  const saveGroup = () => {
+  const saveGroup = async () => {
     if (!editGroup) return;
-    setGroups(prev => prev.map(g => g.id === editGroup.id ? editGroup : g));
+    try {
+      const res = await fetch(apiUrl(`/api/v1/groups/${editGroup.id}`), {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ display_name: editGroup.name }),
+      });
+      if (res.ok) await fetchUsers();
+    } catch { /* silent */ }
     setEditGroup(null);
   };
 
@@ -178,16 +196,23 @@ export default function UsersGroupsPage() {
     setShowCreateUser(false);
   };
 
-  const handleCreateGroup = () => {
+  const handleCreateGroup = async () => {
     if (!newGroup.name.trim()) return;
-    setGroups(prev => [...prev, { ...newGroup, id: 'g' + Date.now() }]);
-    setNewGroup({ id: '', name: '', memberCount: 0, description: '' });
+    try {
+      const res = await fetch(apiUrl('/api/v1/groups'), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ display_name: newGroup.name }),
+      });
+      if (res.ok) await fetchUsers();
+    } catch { /* silent */ }
+    setNewGroup({ id: '', name: '', memberCount: 0, description: '', source: 'local' });
     setShowCreateGroup(false);
   };
 
   const handleDeleteUser = async (id: string) => {
     try {
-      const res = await fetch(`/api/v1/users/${id}`, {
+      const res = await fetch(apiUrl(`/api/v1/users/${id}`), {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -197,9 +222,17 @@ export default function UsersGroupsPage() {
     } catch { /* silent */ }
   };
 
-  const handleDeleteGroup = (id: string) => {
-    setGroups(prev => prev.filter(g => g.id !== id));
+  const handleDeleteGroup = async (id: string) => {
+    try {
+      const res = await fetch(apiUrl(`/api/v1/groups/${id}`), {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) await fetchUsers();
+    } catch { /* silent */ }
   };
+
+  const allGroupNames = groups.map(group => group.name);
 
   return (
     <div className="space-y-6">
@@ -387,8 +420,12 @@ export default function UsersGroupsPage() {
                   <h3 className="font-semibold">{group.name}</h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setEditGroup({ ...group })} className="p-1 text-gray-500 hover:text-blue-400 transition-colors"><Pencil size={14} /></button>
-                  <button onClick={() => handleDeleteGroup(group.id)} className="p-1 text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                  {group.source !== 'scim' && (
+                    <>
+                      <button onClick={() => setEditGroup({ ...group })} className="p-1 text-gray-500 hover:text-blue-400 transition-colors"><Pencil size={14} /></button>
+                      <button onClick={() => handleDeleteGroup(group.id)} className="p-1 text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                    </>
+                  )}
                 </div>
               </div>
               <p className="text-xs text-gray-500 mb-3">{group.description}</p>
