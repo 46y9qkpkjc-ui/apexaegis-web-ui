@@ -616,7 +616,7 @@ export default function IdentityProvidersPage() {
                 {provider.enabled && provider.client_id && (
                   <div className="mt-3 pt-3 border-t border-gray-800/50 flex items-center justify-between">
                     <span className="text-[11px] text-gray-600">SSO Login Endpoint</span>
-                    <a href={`/api/v1/auth/sso/${provider.id}/authorize`} target="_blank" rel="noopener noreferrer"
+                    <a href={apiUrl(`/api/v1/auth/sso/${provider.id}/authorize`)} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300">
                       <ExternalLink size={10} /> /api/v1/auth/sso/{provider.id}/authorize
                     </a>
