@@ -4,9 +4,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Shield, Eye, EyeOff, Fingerprint, Lock, ArrowRight,
   Smartphone, KeyRound, Loader2, AlertCircle, CheckCircle2,
-  MonitorSmartphone, Building2, Wifi, WifiOff,
+  Building2, Wifi, WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
 import type { SsoMethod } from '@/lib/auth-store';
 
@@ -139,18 +140,14 @@ function DetectionStep({ onComplete }: { onComplete: (kerberos: boolean, microso
 function SsoPromptStep({
   kerberos,
   microsoft,
-  isDevMode,
   onSelectSso,
-  onSkipSso,
   onUseCredentials,
   ssoProviders,
   onSsoProviderClick,
 }: {
   kerberos: boolean;
   microsoft: boolean;
-  isDevMode: boolean;
   onSelectSso: (method: SsoMethod) => void;
-  onSkipSso: () => void;
   onUseCredentials: () => void;
   ssoProviders: SSOProvider[];
   onSsoProviderClick: (id: string) => void;
@@ -205,19 +202,6 @@ function SsoPromptStep({
           </button>
         )}
 
-        {/* SAML fallback always available */}
-        <button
-          onClick={() => onSelectSso('saml')}
-          className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-800/40 hover:bg-gray-800/60 border border-gray-700 hover:border-gray-600 rounded-xl text-sm transition-all group"
-        >
-          <Shield size={20} className="text-purple-400" />
-          <div className="text-left flex-1">
-            <div className="font-medium text-gray-300 group-hover:text-white">SAML / External IdP</div>
-            <div className="text-[11px] text-gray-500">Okta, OneLogin, PingIdentity, etc.</div>
-          </div>
-          <ArrowRight size={14} className="text-gray-600 group-hover:text-purple-400 transition-colors" />
-        </button>
-
         {/* Dynamic SSO providers from management plane */}
         {ssoProviders.map(p => {
           const colors: Record<string, string> = {
@@ -261,16 +245,6 @@ function SsoPromptStep({
           Sign in with credentials
         </button>
 
-        {/* Dev bypass */}
-        {isDevMode && !anyDetected && (
-          <button
-            onClick={onSkipSso}
-            className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-amber-700/40 hover:border-amber-600/60 bg-amber-950/10 hover:bg-amber-950/20 rounded-xl text-xs text-amber-400/80 hover:text-amber-400 transition-all"
-          >
-            <MonitorSmartphone size={14} />
-            Continue without SSO (dev environment)
-          </button>
-        )}
       </div>
     </div>
   );
@@ -282,7 +256,7 @@ function SsoPromptStep({
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { step, setStep, setSsoProbe, setSsoMethod, ssoProbe, isDevMode, signIn } = useAuthStore();
+  const { step, setStep, setSsoProbe, setSsoMethod, ssoProbe, signIn } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -297,7 +271,7 @@ export default function LoginPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/v1/auth/sso/providers');
+        const res = await fetch(apiUrl('/api/v1/auth/sso/providers'));
         if (res.ok) {
           const data = await res.json();
           setSsoProviders(data.sso_providers ?? []);
@@ -316,7 +290,7 @@ export default function LoginPage() {
       setLoading(true);
       setStep('credentials'); // show a loading state
       try {
-        const res = await fetch('/api/v1/auth/sso/callback', {
+        const res = await fetch(apiUrl('/api/v1/auth/sso/callback'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code, state }),
@@ -345,7 +319,7 @@ export default function LoginPage() {
   const handleSsoProviderClick = useCallback(async (idpId: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/auth/sso/${encodeURIComponent(idpId)}/authorize`);
+      const res = await fetch(apiUrl(`/api/v1/auth/sso/${encodeURIComponent(idpId)}/authorize`));
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Failed to start SSO' }));
         toast.error(data.error || 'SSO authorize failed');
@@ -379,28 +353,14 @@ export default function LoginPage() {
     [setSsoProbe, setStep],
   );
 
-  /* SSO sign-in (simulated) */
+  /* Local SSO probes only hand off to configured IdP providers. */
   const handleSsoSignIn = (method: SsoMethod) => {
     setSsoMethod(method);
-    setLoading(true);
     const label =
       method === 'kerberos' ? 'Kerberos SSO' :
       method === 'microsoft' ? 'Microsoft Entra ID' : 'SAML';
-    toast.info(`Authenticating via ${label}...`);
-    setTimeout(() => {
-      setLoading(false);
-      signIn({ email: 'admin@apexaegis.io', name: 'Administrator', role: 'super_admin' });
-      toast.success(`Signed in via ${label}`);
-      router.push('/');
-    }, 1200);
-  };
-
-  /* Dev bypass */
-  const handleDevBypass = () => {
-    setSsoMethod('none');
-    signIn({ email: 'dev@apexaegis.local', name: 'Developer', role: 'admin' });
-    toast.success('Dev mode — signed in without SSO');
-    router.push('/');
+    toast.info(`${label} is not configured for this tenant yet. Use the configured Okta provider or local administrator credentials.`);
+    setStep('sso-prompt');
   };
 
   /* Credentials submit */
@@ -412,7 +372,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/auth/login', {
+      const res = await fetch(apiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -425,15 +385,8 @@ export default function LoginPage() {
       }
       // Check if user has MFA enabled
       if (data.user?.mfa_enabled) {
-        // Store tokens temporarily — will finalize after MFA
-        signIn(
-          { email: data.user.email, name: data.user.name, role: data.user.role, id: data.user.id, org_id: data.user.org_id, mfa_enabled: data.user.mfa_enabled },
-          data.access_token,
-          data.refresh_token,
-        );
         setLoading(false);
-        setStep('mfa');
-        toast.info('MFA verification required');
+        toast.error('MFA is required for this account. Use SSO until MFA verification is enabled.');
         return;
       }
       // No MFA — sign in directly
@@ -447,7 +400,7 @@ export default function LoginPage() {
       router.push('/');
     } catch {
       setLoading(false);
-      toast.error('Network error — is the management plane running?');
+      toast.error('Network error — check that https://api.apexaegis.app is reachable from this browser.');
     }
   };
 
@@ -458,13 +411,7 @@ export default function LoginPage() {
       toast.error('Enter a valid 6-digit code');
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      signIn({ email, name: 'Administrator', role: 'super_admin' });
-      toast.success('Signed in successfully');
-      router.push('/');
-    }, 600);
+    toast.error('MFA verification is not enabled for local administrator login yet. Use SSO for MFA-protected users.');
   };
 
   /* ─── Render ─── */
@@ -541,9 +488,7 @@ export default function LoginPage() {
             <SsoPromptStep
               kerberos={ssoProbe.kerberos}
               microsoft={ssoProbe.microsoft}
-              isDevMode={isDevMode}
               onSelectSso={handleSsoSignIn}
-              onSkipSso={handleDevBypass}
               onUseCredentials={() => setStep('credentials')}
               ssoProviders={ssoProviders}
               onSsoProviderClick={handleSsoProviderClick}
@@ -563,7 +508,7 @@ export default function LoginPage() {
                   <label className="block text-sm text-gray-400 mb-1.5" htmlFor="email">Email Address</label>
                   <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
                     className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700/80 rounded-xl text-sm focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10 transition-all placeholder:text-gray-600"
-                    placeholder="admin@apexaegis.io" autoComplete="email" autoFocus />
+                    placeholder="admin@apexaegis.app" autoComplete="email" autoFocus />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -692,11 +637,6 @@ export default function LoginPage() {
                   ) : (
                     <>Verify & Sign In <ArrowRight size={14} /></>
                   )}
-                </button>
-
-                <button type="button" onClick={() => { setLoading(true); setTimeout(() => { setLoading(false); signIn({ email, name: 'Administrator', role: 'super_admin' }); toast.success('Signed in successfully'); router.push('/'); }, 500); }}
-                  className="w-full py-2 text-xs text-blue-400 hover:text-blue-300 transition-colors font-medium">
-                  Skip MFA (Demo Mode)
                 </button>
 
                 <button type="button" onClick={() => { setStep('credentials'); setMfaCode(''); }}
