@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import {
-  Settings, Users, Save, Plus, X, AlertCircle, CheckCircle, Loader
+  Settings, Users, Save, AlertCircle, CheckCircle, Loader
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { TunnelSettingsComponent } from '@/components/client-config/TunnelSettings';
@@ -10,6 +10,8 @@ import { PrivateAccessSettingsComponent } from '@/components/client-config/Priva
 import { InstallSettingsComponent } from '@/components/client-config/InstallSettings';
 import { TamperproofSettingsComponent } from '@/components/client-config/TamperproofSettings';
 import { saveClientConfig, listClientConfigs, createClientConfig } from '@/lib/client-config-api';
+import { apiUrl } from '@/lib/api-url';
+import { useAuthStore } from '@/lib/auth-store';
 
 // Re-export types used by sub-components
 export interface TunnelSettings {
@@ -66,6 +68,7 @@ interface ClientGroupConfig {
   id?: string;
   group_id: string;
   group_name: string;
+  priority: number;
   tunnel_settings: TunnelSettings;
   features_settings: FeaturesSettings;
   private_access_settings: PrivateAccessSettings;
@@ -83,6 +86,7 @@ interface ClientGroupConfig {
 const DEFAULT_CONFIG: ClientGroupConfig = {
   group_id: 'default',
   group_name: 'Default',
+  priority: 1000,
   tunnel_settings: {
     protocol: 'both',
     enable_quic: true,
@@ -137,11 +141,10 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
   updated_at: new Date().toISOString(),
 };
 
-const demoConfigs: ClientGroupConfig[] = [
-  DEFAULT_CONFIG,
-  { ...DEFAULT_CONFIG, group_id: 'engineering', group_name: 'Engineering', features_settings: { ...DEFAULT_CONFIG.features_settings, dlp: { ...DEFAULT_CONFIG.features_settings.dlp, enabled: true } } },
-  { ...DEFAULT_CONFIG, group_id: 'executives', group_name: 'Executives', tamperproof_settings: { ...DEFAULT_CONFIG.tamperproof_settings, fail_close_mode: 'internet_only' } },
-];
+interface ApiGroup {
+  id: string;
+  display_name: string;
+}
 
 const sections = [
   { id: 'tunnel', label: '🌐 Tunnel', icon: '⚡' },
@@ -152,17 +155,48 @@ const sections = [
 ];
 
 export default function ClientConfigPage() {
-  const [configs, setConfigs] = useState<ClientGroupConfig[]>(demoConfigs);
+  const [configs, setConfigs] = useState<ClientGroupConfig[]>([DEFAULT_CONFIG]);
   const [selectedGroup, setSelectedGroup] = useState<string>('default');
   const [activeSection, setActiveSection] = useState<string>('tunnel');
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newGroupId, setNewGroupId] = useState('');
-  const [newGroupName, setNewGroupName] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const config = configs.find((c) => c.group_id === selectedGroup) || configs[0];
+  const config = configs.find((c) => c.group_id === selectedGroup) || DEFAULT_CONFIG;
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const token = useAuthStore.getState().accessToken ?? '';
+        const [savedConfigs, groupsResponse] = await Promise.all([
+          listClientConfigs(),
+          fetch(apiUrl('/api/v1/groups'), {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+        if (!groupsResponse.ok) throw new Error(`Failed to load groups: HTTP ${groupsResponse.status}`);
+        const groupsPayload = await groupsResponse.json();
+        const groups: ApiGroup[] = groupsPayload.groups ?? [];
+        const savedByGroup = new Map(savedConfigs.map((item: ClientGroupConfig) => [item.group_id, item]));
+        const groupConfigs = groups.map((group) => (
+          savedByGroup.get(group.id) ?? {
+            ...DEFAULT_CONFIG,
+            group_id: group.id,
+            group_name: group.display_name,
+            updated_at: '',
+          }
+        ));
+        const defaultConfig = savedByGroup.get('default') ?? DEFAULT_CONFIG;
+        setConfigs([defaultConfig, ...groupConfigs]);
+      } catch (error) {
+        setStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to load client configurations' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const updateConfig = (updater: (c: ClientGroupConfig) => ClientGroupConfig) => {
     setConfigs((prev) => prev.map((c) => (c.group_id === selectedGroup ? updater(c) : c)));
@@ -173,7 +207,11 @@ export default function ClientConfigPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveClientConfig(config.group_id, config);
+      const exists = Boolean(config.id);
+      const saved = exists
+        ? await saveClientConfig(config.group_id, config)
+        : await createClientConfig(config);
+      setConfigs((prev) => prev.map((item) => item.group_id === config.group_id ? saved : item));
       setDirty(false);
       setStatus({ type: 'success', message: 'Configuration saved successfully' });
       setTimeout(() => setStatus(null), 3000);
@@ -181,26 +219,6 @@ export default function ClientConfigPage() {
       setStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to save' });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleCreateGroup = async () => {
-    const id = newGroupId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-    const name = newGroupName.trim();
-    if (!id || !name || configs.some((c) => c.group_id === id)) return;
-
-    const newConfig = { ...DEFAULT_CONFIG, group_id: id, group_name: name };
-    try {
-      await createClientConfig(newConfig);
-      setConfigs((prev) => [...prev, newConfig]);
-      setSelectedGroup(id);
-      setShowCreate(false);
-      setNewGroupId('');
-      setNewGroupName('');
-      setStatus({ type: 'success', message: `Group "${name}" created` });
-      setTimeout(() => setStatus(null), 3000);
-    } catch (error) {
-      setStatus({ type: 'error', message: 'Failed to create group' });
     }
   };
 
@@ -237,6 +255,7 @@ export default function ClientConfigPage() {
 
       {/* Group Selector */}
       <div className="flex gap-2 flex-wrap">
+        {loading && <span className="text-sm text-gray-500">Loading SCIM groups...</span>}
         {configs.map((c) => (
           <button
             key={c.group_id}
@@ -252,44 +271,22 @@ export default function ClientConfigPage() {
             {c.group_name}
           </button>
         ))}
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-dashed border-gray-700 text-gray-500 hover:text-blue-400"
-        >
-          <Plus size={12} className="inline mr-1" /> New Group
-        </button>
       </div>
 
-      {/* Create Group Modal */}
-      {showCreate && (
-        <div className="bg-gray-900 border border-blue-500/30 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-blue-400">Create New Group</h3>
-            <button onClick={() => setShowCreate(false)} className="text-gray-500 hover:text-gray-300">
-              <X size={14} />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <input
-              value={newGroupId}
-              onChange={(e) => setNewGroupId(e.target.value)}
-              placeholder="Group ID"
-              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-blue-600"
-            />
-            <input
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="Group Name"
-              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-blue-600"
-            />
-          </div>
-          <button
-            onClick={handleCreateGroup}
-            disabled={!newGroupId.trim() || !newGroupName.trim()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 rounded-lg text-sm font-medium"
-          >
-            Create
-          </button>
+      {/* Section Tabs */}
+      {config.group_id !== 'default' && (
+        <div className="flex items-center gap-3 text-sm text-gray-400">
+          <label htmlFor="config-priority">Group priority</label>
+          <input
+            id="config-priority"
+            type="number"
+            min={1}
+            max={999}
+            value={config.priority}
+            onChange={(event) => updateConfig((current) => ({ ...current, priority: Number(event.target.value) || 100 }))}
+            className="w-24 px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200"
+          />
+          <span>Lower numbers win when a user belongs to multiple groups.</span>
         </div>
       )}
 
@@ -347,8 +344,8 @@ export default function ClientConfigPage() {
 
       {/* Metadata */}
       <div className="text-xs text-gray-600 flex items-center gap-4">
-        <span>Last updated by {config.updated_by}</span>
-        <span>{new Date(config.updated_at).toLocaleString()}</span>
+        <span>{config.id ? `Last updated by ${config.updated_by}` : 'No saved configuration. Default settings will apply.'}</span>
+        {config.updated_at && <span>{new Date(config.updated_at).toLocaleString()}</span>}
       </div>
     </div>
   );

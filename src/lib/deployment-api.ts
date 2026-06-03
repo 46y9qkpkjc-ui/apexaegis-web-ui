@@ -2,6 +2,8 @@
  * Deployment API Client
  * License consumption is based on active mTLS device registrations.
  */
+import { apiUrl } from '@/lib/api-url';
+import { useAuthStore } from '@/lib/auth-store';
 
 export interface DeploymentInfo {
   org_id: string;
@@ -11,18 +13,16 @@ export interface DeploymentInfo {
   licenses_available: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
-
 export async function getDeploymentInfo(): Promise<DeploymentInfo> {
-  const response = await fetch(`${API_BASE}/v1/admin/organization/deployment-info`, {
+  const token = useAuthStore.getState().accessToken ?? '';
+  const response = await fetch(apiUrl('/api/v1/admin/organization/deployment-info'), {
     headers: {
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
     },
-    credentials: 'include',
   });
 
   if (!response.ok) {
-    throw new Error('Failed to get deployment info');
+    throw new Error(`Failed to get deployment info: HTTP ${response.status}`);
   }
 
   return response.json();

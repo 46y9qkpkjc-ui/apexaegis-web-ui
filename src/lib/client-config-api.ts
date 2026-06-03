@@ -1,12 +1,24 @@
 // Client Configuration API Client
+import { apiUrl } from '@/lib/api-url';
+import { useAuthStore } from '@/lib/auth-store';
+
 export type ClientGroupConfig = any; // Import from page component
+
+function authHeaders(json = false): Record<string, string> {
+  const token = useAuthStore.getState().accessToken ?? '';
+  return {
+    Authorization: `Bearer ${token}`,
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+  };
+}
 
 /**
  * Fetch client configuration for a specific group
  */
 export async function getClientConfig(groupId: string): Promise<ClientGroupConfig> {
-  const response = await fetch(`/api/v1/admin/client-config/${groupId}`, {
+  const response = await fetch(apiUrl(`/api/v1/admin/client-config/${groupId}`), {
     method: 'GET',
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
@@ -20,11 +32,9 @@ export async function getClientConfig(groupId: string): Promise<ClientGroupConfi
  * Save/update client configuration for a group
  */
 export async function saveClientConfig(groupId: string, config: ClientGroupConfig): Promise<ClientGroupConfig> {
-  const response = await fetch(`/api/v1/admin/client-config/${groupId}`, {
+  const response = await fetch(apiUrl(`/api/v1/admin/client-config/${groupId}`), {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(true),
     body: JSON.stringify(config),
   });
 
@@ -40,8 +50,9 @@ export async function saveClientConfig(groupId: string, config: ClientGroupConfi
  * List all client configurations for the organization
  */
 export async function listClientConfigs(): Promise<ClientGroupConfig[]> {
-  const response = await fetch(`/api/v1/admin/client-config`, {
+  const response = await fetch(apiUrl('/api/v1/admin/client-config'), {
     method: 'GET',
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
@@ -55,11 +66,9 @@ export async function listClientConfigs(): Promise<ClientGroupConfig[]> {
  * Create a new client configuration group
  */
 export async function createClientConfig(config: ClientGroupConfig): Promise<ClientGroupConfig> {
-  const response = await fetch(`/api/v1/admin/client-config`, {
+  const response = await fetch(apiUrl('/api/v1/admin/client-config'), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(true),
     body: JSON.stringify(config),
   });
 
@@ -84,8 +93,9 @@ export async function getClientConfigAuditLogs(
   params.append('limit', limit.toString());
   params.append('offset', offset.toString());
 
-  const response = await fetch(`/api/v1/admin/client-config/audit-logs?${params.toString()}`, {
+  const response = await fetch(apiUrl(`/api/v1/admin/client-config/audit-logs?${params.toString()}`), {
     method: 'GET',
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
@@ -99,11 +109,9 @@ export async function getClientConfigAuditLogs(
  * Validate client configuration before saving
  */
 export async function validateClientConfig(config: ClientGroupConfig): Promise<{ valid: boolean; errors: string[] }> {
-  const response = await fetch(`/api/v1/admin/client-config/validate`, {
+  const response = await fetch(apiUrl('/api/v1/admin/client-config/validate'), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(true),
     body: JSON.stringify(config),
   });
 
@@ -118,8 +126,9 @@ export async function validateClientConfig(config: ClientGroupConfig): Promise<{
  * Delete a client configuration group
  */
 export async function deleteClientConfig(groupId: string): Promise<void> {
-  const response = await fetch(`/api/v1/admin/client-config/${groupId}`, {
+  const response = await fetch(apiUrl(`/api/v1/admin/client-config/${groupId}`), {
     method: 'DELETE',
+    headers: authHeaders(),
   });
 
   if (!response.ok) {
