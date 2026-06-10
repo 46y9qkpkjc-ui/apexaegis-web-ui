@@ -141,6 +141,54 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
   updated_at: new Date().toISOString(),
 };
 
+function asArray<T>(value: unknown, fallback: T[] = []): T[] {
+  return Array.isArray(value) ? value as T[] : fallback;
+}
+
+function mergeObject<T extends Record<string, any>>(defaults: T, value: unknown): T {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ...defaults };
+  }
+
+  const input = value as Record<string, any>;
+  const merged: Record<string, any> = { ...defaults };
+  for (const [key, defaultValue] of Object.entries(defaults)) {
+    const nextValue = input[key];
+    if (
+      defaultValue &&
+      typeof defaultValue === 'object' &&
+      !Array.isArray(defaultValue)
+    ) {
+      merged[key] = mergeObject(defaultValue, nextValue);
+    } else if (Array.isArray(defaultValue)) {
+      merged[key] = asArray(nextValue, defaultValue);
+    } else if (nextValue !== null && nextValue !== undefined) {
+      merged[key] = nextValue;
+    }
+  }
+  return merged as T;
+}
+
+function normalizeClientConfig(config: Partial<ClientGroupConfig> | null | undefined): ClientGroupConfig {
+  const base = config ?? {};
+  return {
+    ...DEFAULT_CONFIG,
+    ...base,
+    group_id: base.group_id || DEFAULT_CONFIG.group_id,
+    group_name: base.group_name || DEFAULT_CONFIG.group_name,
+    tunnel_settings: mergeObject(DEFAULT_CONFIG.tunnel_settings, base.tunnel_settings),
+    features_settings: mergeObject(DEFAULT_CONFIG.features_settings, base.features_settings),
+    private_access_settings: mergeObject(DEFAULT_CONFIG.private_access_settings, base.private_access_settings),
+    install_settings: mergeObject(DEFAULT_CONFIG.install_settings, base.install_settings),
+    tamperproof_settings: mergeObject(DEFAULT_CONFIG.tamperproof_settings, base.tamperproof_settings),
+    dns_servers: asArray<string>(base.dns_servers, DEFAULT_CONFIG.dns_servers),
+    allowed_protocols: asArray<string>(base.allowed_protocols, DEFAULT_CONFIG.allowed_protocols),
+    gateway_priority: asArray<string>(base.gateway_priority, DEFAULT_CONFIG.gateway_priority),
+    updated_by: base.updated_by || DEFAULT_CONFIG.updated_by,
+    updated_at: base.updated_at || '',
+  };
+}
+
 interface ApiGroup {
   id: string;
   display_name: string;
@@ -177,17 +225,21 @@ export default function ClientConfigPage() {
         ]);
         if (!groupsResponse.ok) throw new Error(`Failed to load groups: HTTP ${groupsResponse.status}`);
         const groupsPayload = await groupsResponse.json();
-        const groups: ApiGroup[] = groupsPayload.groups ?? [];
-        const savedByGroup = new Map(savedConfigs.map((item: ClientGroupConfig) => [item.group_id, item]));
+        const groups: ApiGroup[] = asArray<ApiGroup>(groupsPayload?.groups)
+          .filter((group) => group && typeof group.id === 'string');
+        const normalizedSavedConfigs = asArray<ClientGroupConfig>(savedConfigs)
+          .map((item) => normalizeClientConfig(item))
+          .filter((item) => item.group_id);
+        const savedByGroup = new Map(normalizedSavedConfigs.map((item) => [item.group_id, item]));
         const groupConfigs = groups.map((group) => (
           savedByGroup.get(group.id) ?? {
             ...DEFAULT_CONFIG,
             group_id: group.id,
-            group_name: group.display_name,
+            group_name: group.display_name || group.id,
             updated_at: '',
           }
         ));
-        const defaultConfig = savedByGroup.get('default') ?? DEFAULT_CONFIG;
+        const defaultConfig = savedByGroup.get('default') ?? normalizeClientConfig(DEFAULT_CONFIG);
         setConfigs([defaultConfig, ...groupConfigs]);
       } catch (error) {
         setStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to load client configurations' });
@@ -211,7 +263,7 @@ export default function ClientConfigPage() {
       const saved = exists
         ? await saveClientConfig(config.group_id, config)
         : await createClientConfig(config);
-      setConfigs((prev) => prev.map((item) => item.group_id === config.group_id ? saved : item));
+      setConfigs((prev) => prev.map((item) => item.group_id === config.group_id ? normalizeClientConfig(saved) : item));
       setDirty(false);
       setStatus({ type: 'success', message: 'Configuration saved successfully' });
       setTimeout(() => setStatus(null), 3000);
