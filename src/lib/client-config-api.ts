@@ -4,6 +4,10 @@ import { useAuthStore } from '@/lib/auth-store';
 
 export type ClientGroupConfig = any; // Import from page component
 
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
 function authHeaders(json = false): Record<string, string> {
   const token = useAuthStore.getState().accessToken ?? '';
   return {
@@ -59,7 +63,7 @@ export async function listClientConfigs(): Promise<ClientGroupConfig[]> {
     throw new Error(`Failed to fetch client configs: HTTP ${response.status}`);
   }
 
-  return await response.json();
+  return asArray<ClientGroupConfig>(await response.json());
 }
 
 /**
@@ -102,7 +106,7 @@ export async function getClientConfigAuditLogs(
     throw new Error(`Failed to fetch audit logs: HTTP ${response.status}`);
   }
 
-  return await response.json();
+  return asArray<any>(await response.json());
 }
 
 /**
