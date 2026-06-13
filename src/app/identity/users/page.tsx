@@ -36,6 +36,7 @@ interface Group {
   memberCount: number;
   description: string;
   source: string;
+  members: string[];
 }
 
 interface ApiGroup {
@@ -99,7 +100,7 @@ export default function UsersGroupsPage() {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newUser, setNewUser] = useState<User>({ id: '', name: '', email: '', role: 'user', groups: [], status: 'active', mfa_enabled: false, last_login_at: null, oauth_provider: '', created_at: null });
-  const [newGroup, setNewGroup] = useState<Group>({ id: '', name: '', memberCount: 0, description: '', source: 'local' });
+  const [newGroup, setNewGroup] = useState<Group>({ id: '', name: '', memberCount: 0, description: '', source: 'local', members: [] });
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -124,6 +125,7 @@ export default function UsersGroupsPage() {
           memberCount: group.members?.length ?? 0,
           description: group.source === 'scim' ? 'Provisioned and managed by your identity provider' : 'Locally managed group',
           source: group.source || 'local',
+          members: group.members ?? [],
         })));
       }
     } catch { /* silent */ }
@@ -145,6 +147,21 @@ export default function UsersGroupsPage() {
   const filteredGroups = groups.filter(g =>
     g.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Build reverse map: userId → group names (works for both admin and client users)
+  const userIdToGroups = groups.reduce<Record<string, string[]>>((acc, group) => {
+    for (const memberId of group.members) {
+      if (!acc[memberId]) acc[memberId] = [];
+      acc[memberId].push(group.name);
+    }
+    return acc;
+  }, {});
+
+  // Build id → display name map for resolving member IDs to names in group cards
+  const idToName = Object.fromEntries([
+    ...users.map(u => [u.id, u.name || u.email]),
+    ...clientUsers.map(u => [u.id, u.name || u.email]),
+  ]);
 
   const activeCount = users.filter(u => u.status === 'active').length;
   const mfaCount = users.filter(u => u.mfa_enabled).length;
@@ -206,7 +223,7 @@ export default function UsersGroupsPage() {
       });
       if (res.ok) await fetchUsers();
     } catch { /* silent */ }
-    setNewGroup({ id: '', name: '', memberCount: 0, description: '', source: 'local' });
+    setNewGroup({ id: '', name: '', memberCount: 0, description: '', source: 'local', members: [] });
     setShowCreateGroup(false);
   };
 
@@ -329,9 +346,12 @@ export default function UsersGroupsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {user.groups.map(g => (
-                        <span key={g} className="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">{g}</span>
+                      {(userIdToGroups[user.id] ?? []).map(g => (
+                        <span key={g} className="px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-300 border border-blue-800/40 text-xs">{g}</span>
                       ))}
+                      {(userIdToGroups[user.id] ?? []).length === 0 && (
+                        <span className="text-xs text-gray-600">—</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -375,6 +395,7 @@ export default function UsersGroupsPage() {
                 <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Title</th>
+                <th className="px-4 py-3">Groups</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Source</th>
                 <th className="px-4 py-3">Provisioned</th>
@@ -390,6 +411,16 @@ export default function UsersGroupsPage() {
                   <td className="px-4 py-3 text-gray-400">{user.department || '—'}</td>
                   <td className="px-4 py-3 text-gray-400">{user.title || '—'}</td>
                   <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(userIdToGroups[user.id] ?? []).map(g => (
+                        <span key={g} className="px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-300 border border-blue-800/40 text-xs">{g}</span>
+                      ))}
+                      {(userIdToGroups[user.id] ?? []).length === 0 && (
+                        <span className="text-xs text-gray-600">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium border ${(statusBadge[user.status] || statusBadge['active']).color}`}>
                       {(statusBadge[user.status] || statusBadge['active']).label}
                     </span>
@@ -401,7 +432,7 @@ export default function UsersGroupsPage() {
                 </tr>
               ))}
               {filteredClientUsers.length === 0 && (
-                <tr><td colSpan={6} className="text-center py-8 text-gray-500 text-sm">No client users provisioned yet. Configure SCIM on your IdP to sync endpoint users.</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-gray-500 text-sm">No client users provisioned yet. Configure SCIM on your IdP to sync endpoint users.</td></tr>
               )}
             </tbody>
           </table>
@@ -420,20 +451,47 @@ export default function UsersGroupsPage() {
                   <h3 className="font-semibold">{group.name}</h3>
                 </div>
                 <div className="flex items-center gap-2">
+                  {group.source === 'scim' && (
+                    <span className="px-1.5 py-0.5 rounded bg-blue-900/20 text-blue-400 text-xs border border-blue-800/40">IdP managed</span>
+                  )}
                   {group.source !== 'scim' && (
                     <>
-                      <button onClick={() => setEditGroup({ ...group })} className="p-1 text-gray-500 hover:text-blue-400 transition-colors"><Pencil size={14} /></button>
+                      <button onClick={() => setEditGroup({ ...group, members: group.members })} className="p-1 text-gray-500 hover:text-blue-400 transition-colors"><Pencil size={14} /></button>
                       <button onClick={() => handleDeleteGroup(group.id)} className="p-1 text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
                     </>
                   )}
                 </div>
               </div>
               <p className="text-xs text-gray-500 mb-3">{group.description}</p>
-              <span className="px-2 py-0.5 rounded bg-blue-900/30 text-blue-300 text-xs">
-                {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
-              </span>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-2 py-0.5 rounded bg-blue-900/30 text-blue-300 text-xs">
+                  {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {group.members.length > 0 && (
+                <div className="border-t border-gray-800 pt-3">
+                  <p className="text-xs text-gray-600 mb-2 uppercase tracking-wide">Members</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.members.slice(0, 8).map(memberId => {
+                      const name = idToName[memberId];
+                      return name ? (
+                        <span key={memberId} className="px-2 py-0.5 rounded bg-gray-800 text-gray-300 text-xs border border-gray-700">{name}</span>
+                      ) : null;
+                    })}
+                    {group.members.length > 8 && (
+                      <span className="px-2 py-0.5 rounded bg-gray-800 text-gray-500 text-xs border border-gray-700">+{group.members.length - 8} more</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {group.members.length === 0 && (
+                <p className="text-xs text-gray-600 italic">No members yet</p>
+              )}
             </div>
           ))}
+          {filteredGroups.length === 0 && (
+            <div className="col-span-2 text-center py-12 text-gray-500 text-sm">No groups found. Groups are synced via SCIM or created locally.</div>
+          )}
         </div>
       )}
 
