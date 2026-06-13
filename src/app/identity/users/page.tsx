@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Pencil, Trash2, Search, Shield, UserCheck, UserX, X } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Search, Shield, UserCheck, UserX, X, History, RotateCcw } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
 
@@ -24,10 +24,24 @@ interface ClientUser {
   department: string;
   title: string;
   status: string;
+  status_reason?: string;
+  status_source?: string;
+  status_updated_at?: string | null;
+  status_updated_by?: string;
   oauth_provider: string;
   scim_external_id: string;
   created_at: string | null;
   updated_at: string | null;
+}
+
+interface ClientUserStatusEvent {
+  id: string;
+  previous_status?: string;
+  new_status: string;
+  reason?: string;
+  source: string;
+  actor_id?: string;
+  created_at: string | null;
 }
 
 interface Group {
@@ -99,6 +113,11 @@ export default function UsersGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editGroup, setEditGroup] = useState<Group | null>(null);
+  const [statusUser, setStatusUser] = useState<ClientUser | null>(null);
+  const [statusEvents, setStatusEvents] = useState<ClientUserStatusEvent[]>([]);
+  const [reactivateUser, setReactivateUser] = useState<ClientUser | null>(null);
+  const [reactivateReason, setReactivateReason] = useState('');
+  const [actionError, setActionError] = useState('');
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newUser, setNewUser] = useState<User>({ id: '', name: '', email: '', role: 'user', groups: [], status: 'active', mfa_enabled: false, last_login_at: null, oauth_provider: '', created_at: null });
@@ -251,6 +270,41 @@ export default function UsersGroupsPage() {
     } catch { /* silent */ }
   };
 
+  const loadStatusEvents = async (user: ClientUser) => {
+    setStatusUser(user);
+    setStatusEvents([]);
+    setActionError('');
+    try {
+      const res = await fetch(apiUrl(`/api/v1/client-users/${user.id}/status-events`), { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setStatusEvents(data.events ?? []);
+    } catch {
+      setActionError('Unable to load client user status history.');
+    }
+  };
+
+  const handleReactivateClientUser = async () => {
+    if (!reactivateUser) return;
+    setActionError('');
+    try {
+      const res = await fetch(apiUrl(`/api/v1/client-users/${reactivateUser.id}/reactivate`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reason: reactivateReason }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      await fetchUsers();
+      setReactivateUser(null);
+      setReactivateReason('');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Unable to reactivate client user.');
+    }
+  };
+
   const allGroupNames = groups.map(group => group.name);
 
   return (
@@ -401,6 +455,7 @@ export default function UsersGroupsPage() {
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Source</th>
                 <th className="px-4 py-3">Provisioned</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -426,15 +481,41 @@ export default function UsersGroupsPage() {
                     <span className={`px-2 py-0.5 rounded text-xs font-medium border ${(statusBadge[user.status] || statusBadge['active']).color}`}>
                       {(statusBadge[user.status] || statusBadge['active']).label}
                     </span>
+                    {(user.status_reason || user.status_source) && (
+                      <div className="mt-1 text-[11px] text-gray-500 max-w-[240px]">
+                        {user.status_reason || 'No reason recorded'}
+                        {user.status_source && <span className="text-gray-600"> · {user.status_source}</span>}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium ${sourceBadge[user.oauth_provider] || 'text-gray-400'}`}>{user.oauth_provider || 'SCIM'}</span>
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{formatLoginTime(user.created_at)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => loadStatusEvents(user)}
+                        className="p-1 text-gray-500 hover:text-blue-400 transition-colors"
+                        title="View status history"
+                      >
+                        <History size={14} />
+                      </button>
+                      {user.status === 'suspended' && user.status_source !== 'idp_policy' && (
+                        <button
+                          onClick={() => { setReactivateUser(user); setReactivateReason('Administrator reactivated user after verifying Okta policy is not blocking access.'); setActionError(''); }}
+                          className="p-1 text-gray-500 hover:text-green-400 transition-colors"
+                          title="Reactivate user"
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
               {filteredClientUsers.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-500 text-sm">No client users provisioned yet. Configure SCIM on your IdP to sync endpoint users.</td></tr>
+                <tr><td colSpan={8} className="text-center py-8 text-gray-500 text-sm">No client users provisioned yet. Configure SCIM on your IdP to sync endpoint users.</td></tr>
               )}
             </tbody>
           </table>
@@ -495,6 +576,77 @@ export default function UsersGroupsPage() {
             <div className="col-span-2 text-center py-12 text-gray-500 text-sm">No groups found. Groups are synced via SCIM or created locally.</div>
           )}
         </div>
+      )}
+
+      {/* Client User Status History Modal */}
+      {statusUser && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setStatusUser(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Status History</h3>
+                <p className="text-xs text-gray-500">{statusUser.email}</p>
+              </div>
+              <button onClick={() => setStatusUser(null)} className="text-gray-500 hover:text-gray-300"><X size={18} /></button>
+            </div>
+            {actionError && <div className="mb-3 rounded-lg border border-red-800 bg-red-900/30 px-3 py-2 text-sm text-red-300">{actionError}</div>}
+            <div className="space-y-3 max-h-[420px] overflow-y-auto">
+              {statusEvents.map(event => (
+                <div key={event.id} className="rounded-lg border border-gray-800 bg-gray-950/50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm">
+                      <span className="text-gray-500">{event.previous_status || 'new'}</span>
+                      <span className="mx-2 text-gray-600">→</span>
+                      <span className="font-medium text-gray-200">{event.new_status}</span>
+                    </div>
+                    <span className="text-xs text-gray-500">{event.created_at ? formatLoginTime(event.created_at) : 'Unknown'}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-400">{event.reason || 'No reason recorded'}</p>
+                  <div className="mt-2 text-xs text-gray-600">Source: {event.source || 'unknown'}{event.actor_id ? ` · Actor: ${event.actor_id}` : ''}</div>
+                </div>
+              ))}
+              {statusEvents.length === 0 && !actionError && (
+                <div className="py-8 text-center text-sm text-gray-500">No status events recorded yet.</div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Reactivate Client User Modal */}
+      {reactivateUser && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setReactivateUser(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Reactivate Client User</h3>
+                <p className="text-xs text-gray-500">{reactivateUser.email}</p>
+              </div>
+              <button onClick={() => setReactivateUser(null)} className="text-gray-500 hover:text-gray-300"><X size={18} /></button>
+            </div>
+            {actionError && <div className="mb-3 rounded-lg border border-red-800 bg-red-900/30 px-3 py-2 text-sm text-red-300">{actionError}</div>}
+            <div className="space-y-3">
+              <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3 text-sm text-gray-400">
+                Local reactivation is allowed only when the suspension was not imposed by Okta/SCIM policy. If Okta still sends <span className="font-mono text-gray-300">active=false</span>, the user will be suspended again on the next SCIM sync.
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Reason</label>
+                <textarea
+                  value={reactivateReason}
+                  onChange={e => setReactivateReason(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setReactivateUser(null)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">Cancel</button>
+              <button onClick={handleReactivateClientUser} className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors">Reactivate</button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Edit User Modal */}
