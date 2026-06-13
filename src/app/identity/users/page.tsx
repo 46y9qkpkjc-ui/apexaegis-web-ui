@@ -51,6 +51,8 @@ const statusBadge: Record<string, { label: string; color: string }> = {
   active: { label: 'Active', color: 'bg-green-900/40 text-green-400 border-green-800' },
   inactive: { label: 'Inactive', color: 'bg-gray-800 text-gray-500 border-gray-700' },
   locked: { label: 'Locked', color: 'bg-red-900/40 text-red-400 border-red-800' },
+  suspended: { label: 'Suspended', color: 'bg-red-900/40 text-red-400 border-red-800' },
+  invited: { label: 'Invited', color: 'bg-yellow-900/40 text-yellow-400 border-yellow-800' },
 };
 
 const roleBadge: Record<string, string> = {
