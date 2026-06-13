@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Settings, Save, Globe, Shield, Bell, Users, Server, Key, Clock, Copy, RefreshCw, Package, AlertCircle, Loader } from 'lucide-react';
+import { Settings, Save, Globe, Bell, Server, Clock, Copy, Package, AlertCircle, Loader } from 'lucide-react';
 import * as deploymentApi from '@/lib/deployment-api';
 
 export default function SettingsPage() {
@@ -91,7 +91,6 @@ export default function SettingsPage() {
     { id: 'general', label: 'General', icon: Globe },
     { id: 'deployment', label: 'Deployment', icon: Package },
     { id: 'network', label: 'Network', icon: Server },
-    { id: 'auth', label: 'Authentication', icon: Key },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'logging', label: 'Logging', icon: Clock },
   ];
@@ -226,54 +225,6 @@ export default function SettingsPage() {
                 <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${network.masqueEnabled ? 'left-5' : 'left-0.5'}`} />
               </button>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'auth' && (
-          <div className="space-y-5 max-w-lg">
-            <h3 className="text-sm font-semibold text-gray-300 mb-4">Authentication & Identity</h3>
-            <div className="p-4 bg-gray-800/30 rounded-lg space-y-3">
-              <div className="flex items-center gap-3">
-                <Shield size={18} className="text-blue-400" />
-                <div>
-                  <div className="text-sm font-medium">Okta SSO</div>
-                  <div className="text-xs text-green-400">Connected</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-gray-500">Tenant URL:</span>
-                  <div className="text-gray-300 font-mono mt-0.5">acme.okta.com</div>
-                </div>
-                <div>
-                  <span className="text-gray-500">Last Sync:</span>
-                  <div className="text-gray-300 mt-0.5">2 hours ago</div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-gray-800/30 rounded-lg space-y-3">
-              <div className="flex items-center gap-3">
-                <Key size={18} className="text-yellow-400" />
-                <div>
-                  <div className="text-sm font-medium">Kerberos Delegation</div>
-                  <div className="text-xs text-green-400">Active</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-gray-500">Realm:</span>
-                  <div className="text-gray-300 font-mono mt-0.5">ACME.COM</div>
-                </div>
-                <div>
-                  <span className="text-gray-500">KDC:</span>
-                  <div className="text-gray-300 font-mono mt-0.5">dc1.acme.com</div>
-                </div>
-              </div>
-            </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">
-              <Users size={16} />
-              Configure Identity Provider
-            </button>
           </div>
         )}
 

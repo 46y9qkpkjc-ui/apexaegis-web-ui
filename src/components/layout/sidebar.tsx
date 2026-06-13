@@ -36,27 +36,6 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Security Posture',
-    items: [
-      { href: '/security', icon: GitBranch, label: 'Attack Paths & Segments' },
-      { href: '/security/attack-comparison', icon: ShieldOff, label: 'Attack Comparison' },
-      { href: '/security/ai-ueba', icon: Brain, label: 'AI/ML & UEBA', featureId: 'ueba' },
-    ],
-  },
-  {
-    label: 'Network',
-    items: [
-      { href: '/sdwan', icon: Router, label: 'SD-WAN Optimizer', featureId: 'sdwan' },
-      { href: '/network-events', icon: Wifi, label: 'Network Events' },
-    ],
-  },
-  {
-    label: 'Discovery',
-    items: [
-      { href: '/ghosted-apps', icon: Ghost, label: 'Ghosted Apps & Services', featureId: 'ghosted-apps' },
-    ],
-  },
-  {
     label: 'Policy & Objects',
     items: [
       { href: '/policies', icon: Shield, label: 'Security Policies' },
@@ -85,7 +64,36 @@ const navGroups: NavGroup[] = [
       { href: '/identity/providers', icon: Key, label: 'Identity Providers' },
       { href: '/admin/abac', icon: Shield, label: 'ABAC Control' },
       { href: '/admin/oauth-api', icon: Key, label: 'OAuth 2.0 & API Keys' },
-      { href: '/admin/idp-config', icon: Settings, label: 'IdP Configuration' },
+    ],
+  },
+  {
+    label: 'Administration',
+    items: [
+      { href: '/audit', icon: FileText, label: 'Audit & Config Mgmt' },
+      { href: '/admin/features', icon: Settings, label: 'Feature Licensing' },
+      { href: '/admin/client-config', icon: Users, label: 'Client Config' },
+      { href: '/admin/route-config', icon: Network, label: 'Route Policies' },
+    ],
+  },
+  {
+    label: 'Security Posture',
+    items: [
+      { href: '/security', icon: GitBranch, label: 'Attack Paths & Segments' },
+      { href: '/security/attack-comparison', icon: ShieldOff, label: 'Attack Comparison' },
+      { href: '/security/ai-ueba', icon: Brain, label: 'AI/ML & UEBA', featureId: 'ueba' },
+    ],
+  },
+  {
+    label: 'Network',
+    items: [
+      { href: '/sdwan', icon: Router, label: 'SD-WAN Optimizer', featureId: 'sdwan' },
+      { href: '/network-events', icon: Wifi, label: 'Network Events' },
+    ],
+  },
+  {
+    label: 'Discovery',
+    items: [
+      { href: '/ghosted-apps', icon: Ghost, label: 'Ghosted Apps & Services', featureId: 'ghosted-apps' },
     ],
   },
   {
@@ -104,15 +112,6 @@ const navGroups: NavGroup[] = [
       { href: '/compliance', icon: ShieldCheck, label: 'Compliance Report', featureId: 'compliance-report' },
       { href: '/compliance/certifications', icon: Award, label: 'Certification Report' },
       { href: '/compliance/itsm-automation', icon: Workflow, label: 'ITSM Automation' },
-    ],
-  },
-  {
-    label: 'Administration',
-    items: [
-      { href: '/audit', icon: FileText, label: 'Audit & Config Mgmt' },
-      { href: '/admin/features', icon: Settings, label: 'Feature Licensing' },
-      { href: '/admin/client-config', icon: Users, label: 'Client Config' },
-      { href: '/admin/route-config', icon: Network, label: 'Route Policies' },
     ],
   },
   {
