@@ -8,7 +8,7 @@ interface TamperproofSettings {
   protect_all_internet_private: { enabled: boolean; password_protected: boolean };
   protect_internet_only: { enabled: boolean; password_protected: boolean };
   protect_private_only: { enabled: boolean; password_protected: boolean };
-  fail_close_exceptions: { enabled: boolean };
+  fail_close_exceptions: { enabled: boolean; process_names: string[]; fqdns: string[] };
   uninstall_protection: { enabled: boolean; password_required: boolean };
   cert_pinning: { enabled: boolean };
 }
@@ -160,16 +160,10 @@ export function TamperproofSettingsComponent({ settings, onChange }: Props) {
             </button>
           </div>
 
-          {settings.fail_close_exceptions.enabled && (
-            <div className="bg-blue-900/20 border border-blue-800/30 rounded-lg p-3">
-              <p className="text-xs text-blue-300 mb-2">Examples of exceptions:</p>
-              <ul className="text-xs text-blue-200 space-y-1">
-                <li>• TeamViewer (for remote troubleshooting)</li>
-                <li>• Specific VPN apps for contractor access</li>
-                <li>• Critical system services</li>
-              </ul>
-            </div>
-          )}
+          {settings.fail_close_exceptions.enabled && <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div><label className="text-xs text-gray-500 block mb-1">Process names, one per line</label><textarea rows={5} value={settings.fail_close_exceptions.process_names.join('\n')} onChange={e => updateField('fail_close_exceptions.process_names', e.target.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean))} placeholder={'msedge.exe\nTeamViewer.exe'} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono" /></div>
+            <div><label className="text-xs text-gray-500 block mb-1">FQDNs, one per line</label><textarea rows={5} value={settings.fail_close_exceptions.fqdns.join('\n')} onChange={e => updateField('fail_close_exceptions.fqdns', e.target.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean))} placeholder={'login.okta.com\ndevice-api.apexaegis.app'} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono" /></div>
+          </div>}
         </div>
       </div>
 

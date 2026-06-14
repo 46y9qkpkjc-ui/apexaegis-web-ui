@@ -43,6 +43,12 @@ interface ApiDevice {
   created_at?: string;
 }
 
+interface DeviceDetail {
+  device: ApiDevice;
+  posture?: { checked_at: string; compliant: boolean; score: number; disk_encrypted: boolean; firewall_enabled: boolean; antivirus_running: boolean; antivirus_name: string; os_version: string };
+  logs: Array<{ logged_at: string; level: string; source: string; message: string }>;
+}
+
 interface PostureProfile {
   id: string;
   name: string;
@@ -172,6 +178,8 @@ export default function DevicesPage() {
   const [viewPosture, setViewPosture] = useState<PostureProfile | null>(null);
   const [loadingDevices, setLoadingDevices] = useState(true);
   const [deviceError, setDeviceError] = useState<string | null>(null);
+  const [deviceDetail, setDeviceDetail] = useState<DeviceDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const loadDevices = useCallback(async () => {
     setLoadingDevices(true);
@@ -196,6 +204,20 @@ export default function DevicesPage() {
   useEffect(() => {
     loadDevices();
   }, [loadDevices]);
+
+  const openDeviceDetail = async (device: Device) => {
+    setLoadingDetail(true);
+    setDeviceDetail({ device: { id: device.id, device_id: device.id, device_name: device.name }, logs: [] });
+    try {
+      const token = useAuthStore.getState().accessToken;
+      const res = await fetch(apiUrl(`/api/v1/devices/${device.id}`), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw new Error(`Device detail rejected: HTTP ${res.status}`);
+      setDeviceDetail(await res.json());
+    } catch (error) {
+      setDeviceError(error instanceof Error ? error.message : 'Unable to load device detail');
+      setDeviceDetail(null);
+    } finally { setLoadingDetail(false); }
+  };
 
   const filtered = devices.filter(d => {
     const s = search.toLowerCase();
@@ -350,6 +372,7 @@ export default function DevicesPage() {
                       <td className="px-4 py-3 text-gray-500 text-xs">{device.registeredAt}</td>
                       <td className="px-4 py-3 text-gray-400 text-xs">{device.lastSeen}</td>
                       <td className="px-4 py-3 text-right">
+                        <button onClick={() => openDeviceDetail(device)} className="p-1 text-gray-500 hover:text-cyan-400 transition-colors" title="View scorecard"><Eye size={14} /></button>
                         <button onClick={() => setEditDevice({ ...device })} className="p-1 text-gray-500 hover:text-blue-400 transition-colors"><Pencil size={14} /></button>
                       </td>
                     </tr>
@@ -456,6 +479,24 @@ export default function DevicesPage() {
       )}
 
       {/* ═══════ MODAL: EDIT DEVICE ═══════ */}
+      {deviceDetail && <>
+        <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setDeviceDetail(null)} role="presentation" />
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[760px] max-w-[94vw] max-h-[88vh] overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-6">
+          <div className="flex items-center justify-between mb-5"><div><h3 className="text-lg font-semibold">{deviceDetail.device.device_name || deviceDetail.device.device_id}</h3><p className="text-xs text-gray-500">Device posture scorecard and client logs</p></div><button onClick={() => setDeviceDetail(null)}><X size={16} /></button></div>
+          {loadingDetail ? <div className="py-10 text-center text-gray-500">Loading scorecard...</div> : <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              <Score label="Posture Score" value={deviceDetail.posture ? `${deviceDetail.posture.score}/100` : 'Unknown'} ok={Boolean(deviceDetail.posture?.compliant)} />
+              <Score label="Disk Encryption" value={deviceDetail.posture?.disk_encrypted ? 'Compliant' : 'Non-compliant'} ok={Boolean(deviceDetail.posture?.disk_encrypted)} />
+              <Score label="Firewall" value={deviceDetail.posture?.firewall_enabled ? 'Compliant' : 'Non-compliant'} ok={Boolean(deviceDetail.posture?.firewall_enabled)} />
+              <Score label="Antivirus" value={deviceDetail.posture?.antivirus_running ? deviceDetail.posture.antivirus_name || 'Running' : 'Non-compliant'} ok={Boolean(deviceDetail.posture?.antivirus_running)} />
+            </div>
+            <div className="text-xs text-gray-500 mb-2">Last posture check: {formatTime(deviceDetail.posture?.checked_at)}</div>
+            <h4 className="text-sm font-semibold mb-2">Recent client logs</h4>
+            <div className="border border-gray-800 rounded-lg max-h-72 overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-gray-900"><tr className="text-left text-gray-500"><th className="p-2">Time</th><th className="p-2">Source</th><th className="p-2">Message</th></tr></thead><tbody>{deviceDetail.logs.map((log, index) => <tr key={`${log.logged_at}-${index}`} className="border-t border-gray-800"><td className="p-2 whitespace-nowrap text-gray-500">{formatTime(log.logged_at)}</td><td className="p-2 text-cyan-400">{log.source}</td><td className="p-2 font-mono text-gray-300 break-all">{log.message}</td></tr>)}{deviceDetail.logs.length === 0 && <tr><td colSpan={3} className="p-6 text-center text-gray-500">No client logs have been uploaded yet.</td></tr>}</tbody></table></div>
+          </>}
+        </div>
+      </>}
+
       {editDevice && (
         <>
           <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setEditDevice(null)} role="presentation" />
@@ -576,6 +617,10 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
         className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-600" />
     </div>
   );
+}
+
+function Score({ label, value, ok }: { label: string; value: string; ok: boolean }) {
+  return <div className={`rounded-lg border p-3 ${ok ? 'border-green-800 bg-green-900/20' : 'border-red-800 bg-red-900/20'}`}><div className="text-[10px] uppercase text-gray-500">{label}</div><div className={`mt-1 text-sm font-medium ${ok ? 'text-green-400' : 'text-red-400'}`}>{value}</div></div>;
 }
 
 function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {

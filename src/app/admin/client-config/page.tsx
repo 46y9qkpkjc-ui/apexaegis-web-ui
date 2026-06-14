@@ -15,11 +15,11 @@ import { useAuthStore } from '@/lib/auth-store';
 
 // Re-export types used by sub-components
 export interface TunnelSettings {
-  protocol: 'quic' | 'dtls' | 'both';
+  protocol: 'quic' | 'tls' | 'both';
   enable_quic: boolean;
-  enable_dtls: boolean;
+  enable_tls: boolean;
   device_posture_enabled: boolean;
-  posture_check_interval_mins: number;
+  posture_check_interval_seconds: number;
   allow_user_gateway_select: boolean;
   perform_sni_check: boolean;
   sni_cert_validation: 'strict' | 'loose';
@@ -28,12 +28,12 @@ export interface TunnelSettings {
 
 export interface FeaturesSettings {
   dlp: { enabled: boolean; usb_drives: boolean; printers: boolean; clipboard_copy_paste: boolean; screenshot_print_screen: boolean };
-  dns_filtering: { enabled: boolean; filter_mode: 'block' | 'log'; block_malware: boolean; block_adult_content: boolean };
-  url_filtering: { enabled: boolean; block_categories: string[] };
-  file_type_download_control: { enabled: boolean; blocked_extensions: string[] };
-  sandboxing: { enabled: boolean };
-  http_header_filtering: { enabled: boolean };
-  web_client_filtering: { enabled: boolean; blocked_clients: string[] };
+  dns_routing: { enabled: boolean; resolver: string; exceptions: string[] };
+  split_tunnel_enabled: boolean;
+  collab_optimization: boolean;
+  other_vpn_bypass: boolean;
+  ssl_inspection: boolean;
+  log_forwarding: boolean;
 }
 
 export interface PrivateAccessSettings {
@@ -59,7 +59,7 @@ export interface TamperproofSettings {
   protect_all_internet_private: { enabled: boolean; password_protected: boolean };
   protect_internet_only: { enabled: boolean; password_protected: boolean };
   protect_private_only: { enabled: boolean; password_protected: boolean };
-  fail_close_exceptions: { enabled: boolean };
+  fail_close_exceptions: { enabled: boolean; process_names: string[]; fqdns: string[] };
   uninstall_protection: { enabled: boolean; password_required: boolean };
   cert_pinning: { enabled: boolean };
 }
@@ -90,9 +90,9 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
   tunnel_settings: {
     protocol: 'both',
     enable_quic: true,
-    enable_dtls: false,
+    enable_tls: true,
     device_posture_enabled: true,
-    posture_check_interval_mins: 60,
+    posture_check_interval_seconds: 60,
     allow_user_gateway_select: true,
     perform_sni_check: true,
     sni_cert_validation: 'strict',
@@ -100,12 +100,12 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
   },
   features_settings: {
     dlp: { enabled: false, usb_drives: false, printers: false, clipboard_copy_paste: false, screenshot_print_screen: false },
-    dns_filtering: { enabled: true, filter_mode: 'block', block_malware: true, block_adult_content: false },
-    url_filtering: { enabled: true, block_categories: ['malware', 'phishing'] },
-    file_type_download_control: { enabled: false, blocked_extensions: ['.exe', '.scr', '.bat'] },
-    sandboxing: { enabled: false },
-    http_header_filtering: { enabled: false },
-    web_client_filtering: { enabled: false, blocked_clients: [] },
+    dns_routing: { enabled: true, resolver: '100.64.0.1', exceptions: [] },
+    split_tunnel_enabled: false,
+    collab_optimization: false,
+    other_vpn_bypass: false,
+    ssl_inspection: false,
+    log_forwarding: true,
   },
   private_access_settings: {
     machine_tunnel_enabled: true,
@@ -128,14 +128,14 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
     protect_all_internet_private: { enabled: true, password_protected: true },
     protect_internet_only: { enabled: false, password_protected: false },
     protect_private_only: { enabled: false, password_protected: false },
-    fail_close_exceptions: { enabled: false },
+    fail_close_exceptions: { enabled: false, process_names: [], fqdns: [] },
     uninstall_protection: { enabled: true, password_required: true },
     cert_pinning: { enabled: false },
   },
   session_timeout_mins: 480,
   periodic_auth_mins: 60,
   dns_servers: ['10.0.0.53'],
-  allowed_protocols: ['quic', 'dtls'],
+  allowed_protocols: ['QUIC', 'TLS'],
   gateway_priority: ['gw-sg-01'],
   updated_by: 'system',
   updated_at: new Date().toISOString(),
@@ -365,7 +365,7 @@ export default function ClientConfigPage() {
         {activeSection === 'tunnel' && (
           <TunnelSettingsComponent
             settings={config.tunnel_settings}
-            onChange={(settings) => updateConfig((c) => ({ ...c, tunnel_settings: settings }))}
+            onChange={(settings) => updateConfig((c) => ({ ...c, tunnel_settings: settings, allowed_protocols: settings.protocol === 'both' ? ['QUIC', 'TLS'] : [settings.protocol.toUpperCase()] }))}
           />
         )}
         {activeSection === 'features' && (
