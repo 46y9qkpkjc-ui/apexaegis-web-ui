@@ -32,29 +32,39 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
       return;
     }
 
-    setCheckingAuth(true);
-    fetch(apiUrl('/api/v1/auth/me'), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`auth check failed: ${res.status}`);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          signOut();
-          router.replace('/login');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setCheckingAuth(false);
-        }
-      });
+    const rejectSession = () => {
+      if (cancelled) return;
+      signOut();
+      router.replace('/login');
+    };
+    const validateSession = async (showLoading = false) => {
+      if (showLoading) setCheckingAuth(true);
+      try {
+        const res = await fetch(apiUrl('/api/v1/auth/me'), {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: 'no-store',
+        });
+        if (!res.ok) rejectSession();
+      } catch {
+        // A temporary network outage should not destroy a valid local session.
+      } finally {
+        if (!cancelled && showLoading) setCheckingAuth(false);
+      }
+    };
+
+    void validateSession(true);
+    const timer = window.setInterval(() => void validateSession(), 30_000);
+    const validateVisibleSession = () => {
+      if (document.visibilityState === 'visible') void validateSession();
+    };
+    window.addEventListener('focus', validateVisibleSession);
+    document.addEventListener('visibilitychange', validateVisibleSession);
 
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', validateVisibleSession);
+      document.removeEventListener('visibilitychange', validateVisibleSession);
     };
   }, [accessToken, isAuth, router, signOut]);
 
