@@ -14,7 +14,7 @@ export function FeaturesSettingsComponent({ settings, onChange }: Props) {
     <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
       <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4"><Route size={14} className="text-cyan-400" />Routing Ownership</h3>
       <div className="space-y-3 text-sm text-gray-300">
-        <p>DNS routing, split tunnel bypass lists, and tunnel exceptions are managed from the Route Configuration page so steering rules stay separate from endpoint behavior.</p>
+        <p>DNS routing, split tunnel bypass lists, and tunnel inclusions are managed from the Route Configuration page so steering rules stay separate from endpoint behavior.</p>
         <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-3 text-xs text-gray-400">
           The desktop client does not perform SSL inspection locally. TLS inspection is enforced on the gateway path, so there is no endpoint SSL inspection toggle here.
         </div>

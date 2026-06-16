@@ -16,6 +16,19 @@ function authHeaders(json = false): Record<string, string> {
   };
 }
 
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  const error = await response.json().catch(() => ({ error: fallback }));
+  return error.error || fallback;
+}
+
+async function putClientConfig(groupId: string, config: ClientGroupConfig): Promise<Response> {
+  return fetch(apiUrl(`/api/v1/admin/client-config/${encodeURIComponent(groupId)}`), {
+    method: 'PUT',
+    headers: authHeaders(true),
+    body: JSON.stringify(config),
+  });
+}
+
 /**
  * Fetch client configuration for a specific group
  */
@@ -36,15 +49,10 @@ export async function getClientConfig(groupId: string): Promise<ClientGroupConfi
  * Save/update client configuration for a group
  */
 export async function saveClientConfig(groupId: string, config: ClientGroupConfig): Promise<ClientGroupConfig> {
-  const response = await fetch(apiUrl(`/api/v1/admin/client-config/${groupId}`), {
-    method: 'PUT',
-    headers: authHeaders(true),
-    body: JSON.stringify(config),
-  });
+  const response = await putClientConfig(groupId, config);
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to save config' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    throw new Error(await readErrorMessage(response, 'Failed to save config'));
   }
 
   return await response.json();
@@ -76,12 +84,23 @@ export async function createClientConfig(config: ClientGroupConfig): Promise<Cli
     body: JSON.stringify(config),
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to create config' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+  if (response.ok) {
+    return await response.json();
   }
 
-  return await response.json();
+  const createError = await readErrorMessage(response, 'Failed to create config');
+
+  // Route and client configuration pages can load a group without its saved row
+  // ID when a stale tab or concurrent admin already created it. In that case,
+  // retrying as an update keeps save semantics stable for operators.
+  if (response.status >= 500 && config?.group_id) {
+    const updateResponse = await putClientConfig(config.group_id, config);
+    if (updateResponse.ok) {
+      return await updateResponse.json();
+    }
+  }
+
+  throw new Error(createError);
 }
 
 /**

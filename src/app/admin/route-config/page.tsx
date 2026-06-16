@@ -145,7 +145,7 @@ function uniqueLines(values: string[]): string[] {
 }
 
 function parseLines(value: string): string[] {
-  return uniqueLines(value.split(/\r?\n/));
+  return uniqueLines(value.split(/\r?\n|[;,]/));
 }
 
 function isCIDRLike(value: string): boolean {
@@ -349,7 +349,7 @@ export default function RouteConfigPage() {
             <Route className="text-purple-400" size={24} />
             Route Configuration
           </h1>
-          <p className="text-sm text-gray-400 mt-1">Define DNS routing, split tunnel bypass, and tunnel exceptions per client group.</p>
+          <p className="text-sm text-gray-400 mt-1">Define DNS routing, split tunnel bypass, and tunnel inclusions per client group.</p>
           <p className="text-xs text-gray-500 mt-1">These settings are delivered to the desktop runtime after user authentication and device-to-user binding.</p>
         </div>
         {dirty && (
@@ -408,7 +408,7 @@ export default function RouteConfigPage() {
               </>
             )}
             <span className="ml-auto px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-lg text-xs text-gray-500">Bypass entries: {stats.bypass}</span>
-            <span className="px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-lg text-xs text-gray-500">Tunnel exceptions: {stats.exceptions}</span>
+            <span className="px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-lg text-xs text-gray-500">Tunnel inclusions: {stats.exceptions}</span>
           </div>
 
           <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 space-y-6">
@@ -461,7 +461,7 @@ export default function RouteConfigPage() {
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">DNS bypass domains, one per line</label>
+                    <label className="text-xs text-gray-500 block mb-1">DNS bypass domains, one per line, comma, or semicolon</label>
                     <textarea
                       rows={6}
                       value={textareaValue(config.routing_settings.dns.bypass_domains)}
@@ -477,7 +477,7 @@ export default function RouteConfigPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">DNS tunnel exceptions, one per line</label>
+                    <label className="text-xs text-gray-500 block mb-1">DNS tunnel inclusions, one per line, comma, or semicolon</label>
                     <textarea
                       rows={6}
                       value={textareaValue(config.routing_settings.dns.tunnel_exceptions)}
@@ -504,6 +504,7 @@ export default function RouteConfigPage() {
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Bypass processes</label>
+                  <div className="text-[11px] text-gray-600 mb-1">Accepts one entry per line, comma, or semicolon.</div>
                   <textarea
                     rows={6}
                     value={textareaValue(config.routing_settings.traffic.bypass_processes)}
@@ -520,6 +521,7 @@ export default function RouteConfigPage() {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Bypass domains</label>
+                  <div className="text-[11px] text-gray-600 mb-1">Accepts one entry per line, comma, or semicolon.</div>
                   <textarea
                     rows={6}
                     value={textareaValue(config.routing_settings.traffic.bypass_domains)}
@@ -536,6 +538,7 @@ export default function RouteConfigPage() {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Bypass networks (CIDR)</label>
+                  <div className="text-[11px] text-gray-600 mb-1">Accepts one entry per line, comma, or semicolon.</div>
                   <textarea
                     rows={6}
                     value={textareaValue(config.routing_settings.traffic.bypass_networks)}
@@ -556,11 +559,12 @@ export default function RouteConfigPage() {
             <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4">
                 <Shield size={14} className="text-amber-400" />
-                Tunnel Exceptions
+                Tunnel Inclusions
               </h3>
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Tunnel process exceptions</label>
+                  <label className="text-xs text-gray-500 block mb-1">Tunnel process inclusions</label>
+                  <div className="text-[11px] text-gray-600 mb-1">Accepts one entry per line, comma, or semicolon.</div>
                   <textarea
                     rows={6}
                     value={textareaValue(config.routing_settings.traffic.tunnel_process_exceptions)}
@@ -576,7 +580,8 @@ export default function RouteConfigPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Tunnel domain exceptions</label>
+                  <label className="text-xs text-gray-500 block mb-1">Tunnel domain inclusions</label>
+                  <div className="text-[11px] text-gray-600 mb-1">Accepts one entry per line, comma, or semicolon.</div>
                   <textarea
                     rows={6}
                     value={textareaValue(config.routing_settings.traffic.tunnel_domain_exceptions)}
@@ -592,7 +597,8 @@ export default function RouteConfigPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Tunnel network exceptions</label>
+                  <label className="text-xs text-gray-500 block mb-1">Tunnel network inclusions</label>
+                  <div className="text-[11px] text-gray-600 mb-1">Accepts one entry per line, comma, or semicolon.</div>
                   <textarea
                     rows={6}
                     value={textareaValue(config.routing_settings.traffic.tunnel_network_exceptions)}
@@ -614,7 +620,7 @@ export default function RouteConfigPage() {
               <h3 className="text-sm font-semibold text-blue-200 mb-2">Precedence</h3>
               <div className="text-xs text-blue-300 space-y-1">
                 <div>1. Group priority decides which configuration a multi-group user receives.</div>
-                <div>2. Tunnel exceptions win over broader bypass intent when both are configured.</div>
+                <div>2. Tunnel inclusions win over broader bypass intent when both are configured.</div>
                 <div>3. Exact domains should be preferred over broad wildcards for operator clarity.</div>
               </div>
             </section>
