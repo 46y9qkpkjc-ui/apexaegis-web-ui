@@ -7,6 +7,7 @@ interface InstallSettings {
   verify_app_domains: boolean;
   app_integrity_verification: boolean;
   auto_update: { enabled: boolean; auto_update_channel: 'stable' | 'beta' };
+  config_sync_interval_mins: number;
   revoke_on_token_deletion: boolean;
   debug_options: { enabled: boolean; log_level: string };
   otp_enforcement: { enabled: boolean };
@@ -99,6 +100,30 @@ export function InstallSettingsComponent({ settings, onChange }: Props) {
               </p>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+        <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4">
+          <Download size={14} className="text-cyan-400" />
+          Delivery & Sync
+        </h3>
+        <div className="space-y-3">
+          <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-3 text-xs text-gray-400">
+            Desktop installers are exposed through the authenticated user portal after sign-in. Anonymous download is not part of the client delivery path.
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Cloud sync interval (minutes)</label>
+            <input
+              type="number"
+              min="5"
+              max="15"
+              value={settings.config_sync_interval_mins}
+              onChange={(e) => updateField('config_sync_interval_mins', Math.min(15, Math.max(5, parseInt(e.target.value, 10) || 15)))}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-blue-600"
+            />
+            <p className="text-[9px] text-gray-600 mt-1">The desktop pulls fresh client and routing policy from the cloud on this cadence after authentication.</p>
+          </div>
         </div>
       </div>
 

@@ -1,355 +1,631 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Globe, Link2, Network, Plus, Save, Search, Server, ToggleLeft, ToggleRight, Trash2, Users } from 'lucide-react';
+import { Globe, Loader, Network, Route, Save, Shield, Users } from 'lucide-react';
 import { clsx } from 'clsx';
-import { listClientConfigs, saveClientConfig } from '@/lib/client-config-api';
+import { apiUrl } from '@/lib/api-url';
+import { useAuthStore } from '@/lib/auth-store';
+import { createClientConfig, listClientConfigs, saveClientConfig } from '@/lib/client-config-api';
 
-type MatchType = 'process' | 'fqdn' | 'domain' | 'cidr' | 'url' | 'dns_query';
-type RouteAction = 'bypass' | 'tunnel' | 'block';
-
-interface RouteRule {
+interface ApiGroup {
   id: string;
-  match_type: MatchType;
-  pattern: string;
-  action: RouteAction;
-  enabled: boolean;
-  comment: string;
-  resolver?: 'system' | 'gateway';
+  display_name: string;
+}
+
+interface RoutingSettings {
+  mode: 'full_tunnel' | 'split_tunnel';
+  dns: {
+    resolver: string;
+    bypass_domains: string[];
+    tunnel_exceptions: string[];
+  };
+  traffic: {
+    bypass_processes: string[];
+    bypass_domains: string[];
+    bypass_networks: string[];
+    tunnel_process_exceptions: string[];
+    tunnel_domain_exceptions: string[];
+    tunnel_network_exceptions: string[];
+  };
 }
 
 interface RouteGroupConfig {
+  id?: string;
   group_id: string;
   group_name: string;
-  version: number;
-  rules: RouteRule[];
+  priority: number;
+  routing_settings: RoutingSettings;
+  source_config: any;
   updated_by: string;
   updated_at: string;
-  source_config: any;
 }
 
-const matchTypeIcons: Record<MatchType, typeof Globe> = {
-  process: Server,
-  fqdn: Globe,
-  domain: Network,
-  cidr: Network,
-  url: Link2,
-  dns_query: Search,
+const DEFAULT_ROUTING_SETTINGS: RoutingSettings = {
+  mode: 'full_tunnel',
+  dns: {
+    resolver: '100.64.0.1',
+    bypass_domains: [],
+    tunnel_exceptions: [],
+  },
+  traffic: {
+    bypass_processes: [],
+    bypass_domains: [],
+    bypass_networks: [],
+    tunnel_process_exceptions: [],
+    tunnel_domain_exceptions: [],
+    tunnel_network_exceptions: [],
+  },
 };
 
-const matchTypeLabels: Record<MatchType, string> = {
-  process: 'Process',
-  fqdn: 'FQDN',
-  domain: 'Domain',
-  cidr: 'CIDR',
-  url: 'URL Pattern',
-  dns_query: 'DNS Query',
+const DEFAULT_CLIENT_CONFIG_PAYLOAD: any = {
+  group_id: 'default',
+  group_name: 'Default',
+  priority: 1000,
+  tunnel_settings: {
+    protocol: 'both',
+    enable_quic: true,
+    enable_tls: true,
+    device_posture_enabled: true,
+    posture_check_interval_seconds: 60,
+    allow_user_gateway_select: true,
+    perform_sni_check: true,
+    sni_cert_validation: 'strict',
+    audit_logs: { disable_with_password: true, fail_close_logs: true, fail_open_logs: false },
+  },
+  features_settings: {
+    dlp: { enabled: false, usb_drives: false, printers: false, clipboard_copy_paste: false, screenshot_print_screen: false },
+    dns_routing: { enabled: true, resolver: '100.64.0.1', exceptions: [] },
+    split_tunnel_enabled: false,
+    collab_optimization: false,
+    other_vpn_bypass: false,
+    ssl_inspection: false,
+    log_forwarding: true,
+  },
+  routing_settings: DEFAULT_ROUTING_SETTINGS,
+  private_access_settings: {
+    machine_tunnel_enabled: true,
+    mtls_enabled: true,
+    device_certificate_required: true,
+    vdi_support: { enabled: false, single_ip_multi_user: false },
+    periodic_auth_hours: 24,
+    partner_tenant_access: { enabled: false },
+  },
+  install_settings: {
+    verify_app_domains: true,
+    app_integrity_verification: true,
+    auto_update: { enabled: true, auto_update_channel: 'stable' },
+    config_sync_interval_mins: 15,
+    revoke_on_token_deletion: true,
+    debug_options: { enabled: false, log_level: 'error' },
+    otp_enforcement: { enabled: false },
+  },
+  tamperproof_settings: {
+    fail_close_mode: 'all_traffic',
+    protect_all_internet_private: { enabled: true, password_protected: true },
+    protect_internet_only: { enabled: false, password_protected: false },
+    protect_private_only: { enabled: false, password_protected: false },
+    fail_close_exceptions: { enabled: false, process_names: [], fqdns: [] },
+    uninstall_protection: { enabled: true, password_required: true },
+    cert_pinning: { enabled: false },
+  },
+  session_timeout_mins: 480,
+  periodic_auth_mins: 60,
+  dns_servers: ['10.0.0.53'],
+  allowed_protocols: ['QUIC', 'TLS'],
+  gateway_priority: ['gw-sg-01'],
+  updated_by: 'system',
+  updated_at: '',
 };
 
-const actionColors: Record<RouteAction, string> = {
-  bypass: 'bg-green-900/30 text-green-400 border-green-800',
-  tunnel: 'bg-blue-900/30 text-blue-400 border-blue-800',
-  block: 'bg-red-900/30 text-red-400 border-red-800',
-};
+function asArray<T>(value: unknown, fallback: T[] = []): T[] {
+  return Array.isArray(value) ? value as T[] : fallback;
+}
+
+function mergeObject<T extends Record<string, any>>(defaults: T, value: unknown): T {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return structuredClone(defaults);
+  }
+  const input = value as Record<string, any>;
+  const merged: Record<string, any> = { ...defaults };
+  for (const [key, defaultValue] of Object.entries(defaults)) {
+    const nextValue = input[key];
+    if (defaultValue && typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
+      merged[key] = mergeObject(defaultValue, nextValue);
+    } else if (Array.isArray(defaultValue)) {
+      merged[key] = asArray(nextValue, defaultValue);
+    } else if (nextValue !== null && nextValue !== undefined) {
+      merged[key] = nextValue;
+    }
+  }
+  return merged as T;
+}
+
+function uniqueLines(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function parseLines(value: string): string[] {
+  return uniqueLines(value.split(/\r?\n/));
+}
+
+function isCIDRLike(value: string): boolean {
+  const trimmed = value.trim();
+  return /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(trimmed);
+}
+
+function normalizeRoutingSettings(config: any): RoutingSettings {
+  if (config?.routing_settings) {
+    const routing = mergeObject(DEFAULT_ROUTING_SETTINGS, config.routing_settings);
+    routing.dns.bypass_domains = uniqueLines(routing.dns.bypass_domains);
+    routing.dns.tunnel_exceptions = uniqueLines(routing.dns.tunnel_exceptions);
+    routing.traffic.bypass_processes = uniqueLines(routing.traffic.bypass_processes);
+    routing.traffic.bypass_domains = uniqueLines(routing.traffic.bypass_domains);
+    routing.traffic.bypass_networks = uniqueLines(routing.traffic.bypass_networks);
+    routing.traffic.tunnel_process_exceptions = uniqueLines(routing.traffic.tunnel_process_exceptions);
+    routing.traffic.tunnel_domain_exceptions = uniqueLines(routing.traffic.tunnel_domain_exceptions);
+    routing.traffic.tunnel_network_exceptions = uniqueLines(routing.traffic.tunnel_network_exceptions);
+    return routing;
+  }
+
+  const routing = structuredClone(DEFAULT_ROUTING_SETTINGS);
+  const featureDns = config?.features_settings?.dns_routing;
+  if (featureDns?.resolver) routing.dns.resolver = featureDns.resolver;
+  routing.dns.bypass_domains.push(...asArray<string>(featureDns?.exceptions));
+
+  const consumeRule = (rule: any) => {
+    const action = String(rule?.policy_action || rule?.action || 'bypass').toLowerCase();
+    const matchType = String(rule?.match_type || rule?.type || 'domain').toLowerCase();
+    const patterns = uniqueLines([
+      ...asArray<string>(rule?.patterns),
+      ...asArray<string>(rule?.domains),
+      ...(typeof rule?.pattern === 'string' ? [rule.pattern] : []),
+    ]);
+    for (const pattern of patterns) {
+      if (matchType === 'dns_query') {
+        if (action === 'tunnel') routing.dns.tunnel_exceptions.push(pattern);
+        else routing.dns.bypass_domains.push(pattern);
+        continue;
+      }
+      if (matchType === 'process') {
+        if (action === 'tunnel') routing.traffic.tunnel_process_exceptions.push(pattern);
+        else routing.traffic.bypass_processes.push(pattern);
+        continue;
+      }
+      if (isCIDRLike(pattern)) {
+        if (action === 'tunnel') routing.traffic.tunnel_network_exceptions.push(pattern);
+        else routing.traffic.bypass_networks.push(pattern);
+        continue;
+      }
+      if (action === 'tunnel') routing.traffic.tunnel_domain_exceptions.push(pattern);
+      else routing.traffic.bypass_domains.push(pattern);
+    }
+  };
+
+  for (const rule of asArray<any>(config?.private_access_settings?.route_policies)) consumeRule(rule);
+  for (const rule of asArray<any>(config?.private_access_settings?.traffic_bypass)) consumeRule(rule);
+  for (const rule of asArray<any>(config?.private_access_settings?.dns_exceptions)) consumeRule(rule);
+
+  routing.dns.bypass_domains = uniqueLines(routing.dns.bypass_domains);
+  routing.dns.tunnel_exceptions = uniqueLines(routing.dns.tunnel_exceptions);
+  routing.traffic.bypass_processes = uniqueLines(routing.traffic.bypass_processes);
+  routing.traffic.bypass_domains = uniqueLines(routing.traffic.bypass_domains);
+  routing.traffic.bypass_networks = uniqueLines(routing.traffic.bypass_networks);
+  routing.traffic.tunnel_process_exceptions = uniqueLines(routing.traffic.tunnel_process_exceptions);
+  routing.traffic.tunnel_domain_exceptions = uniqueLines(routing.traffic.tunnel_domain_exceptions);
+  routing.traffic.tunnel_network_exceptions = uniqueLines(routing.traffic.tunnel_network_exceptions);
+  return routing;
+}
+
+function toRouteGroupConfig(config: any): RouteGroupConfig {
+  const base = { ...DEFAULT_CLIENT_CONFIG_PAYLOAD, ...config };
+  const routing_settings = normalizeRoutingSettings(base);
+  return {
+    id: base.id,
+    group_id: base.group_id,
+    group_name: base.group_name,
+    priority: typeof base.priority === 'number' ? base.priority : 1000,
+    routing_settings,
+    source_config: { ...base, routing_settings },
+    updated_by: base.updated_by ?? '',
+    updated_at: base.updated_at ?? '',
+  };
+}
+
+function buildClientConfigPayload(config: RouteGroupConfig) {
+  const routing = config.routing_settings;
+  const base: any = mergeObject(DEFAULT_CLIENT_CONFIG_PAYLOAD, config.source_config ?? {});
+
+  base.group_id = config.group_id;
+  base.group_name = config.group_name;
+  base.priority = config.priority;
+  base.routing_settings = routing;
+  base.features_settings = {
+    ...base.features_settings,
+    split_tunnel_enabled: routing.mode === 'split_tunnel',
+    dns_routing: {
+      enabled: routing.dns.bypass_domains.length > 0 || routing.dns.tunnel_exceptions.length > 0 || Boolean(routing.dns.resolver),
+      resolver: routing.dns.resolver,
+      exceptions: routing.dns.bypass_domains,
+    },
+  };
+  base.private_access_settings = {
+    ...base.private_access_settings,
+    route_policies: [],
+    traffic_bypass: [],
+    dns_exceptions: [],
+  };
+  return base;
+}
+
+function textareaValue(values: string[]): string {
+  return values.join('\n');
+}
 
 export default function RouteConfigPage() {
   const [configs, setConfigs] = useState<RouteGroupConfig[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState('default');
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const config = configs.find((item) => item.group_id === selectedGroup);
 
   useEffect(() => {
-    let cancelled = false;
     const load = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        const saved = await listClientConfigs();
-        if (cancelled) return;
-        const mapped = saved.map(clientConfigToRouteGroup);
-        setConfigs(mapped);
-        setSelectedGroup(mapped[0]?.group_id ?? '');
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load route configuration');
+        const token = useAuthStore.getState().accessToken ?? '';
+        const [savedConfigs, groupsResponse] = await Promise.all([
+          listClientConfigs(),
+          fetch(apiUrl('/api/v1/groups'), {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+        if (!groupsResponse.ok) throw new Error(`Failed to load groups: HTTP ${groupsResponse.status}`);
+        const groupsPayload = await groupsResponse.json();
+        const groups: ApiGroup[] = asArray<ApiGroup>(groupsPayload?.groups).filter((group) => group && typeof group.id === 'string');
+        const savedByGroup = new Map(asArray<any>(savedConfigs).map((item) => {
+          const mapped = toRouteGroupConfig(item);
+          return [mapped.group_id, mapped] as const;
+        }));
+
+        const defaultGroup = savedByGroup.get('default') ?? toRouteGroupConfig(DEFAULT_CLIENT_CONFIG_PAYLOAD);
+        const groupConfigs = groups.map((group) => (
+          savedByGroup.get(group.id) ?? toRouteGroupConfig({
+            ...DEFAULT_CLIENT_CONFIG_PAYLOAD,
+            group_id: group.id,
+            group_name: group.display_name || group.id,
+          })
+        ));
+        setConfigs([defaultGroup, ...groupConfigs]);
+      } catch (error) {
+        setStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to load route configuration' });
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     };
     load();
-    return () => { cancelled = true; };
   }, []);
 
-  const config = configs.find(c => c.group_id === selectedGroup);
-
-  const stats = useMemo(() => {
-    const rules = config?.rules ?? [];
-    return {
-      bypass: rules.filter(r => r.enabled && r.action === 'bypass').length,
-      tunnel: rules.filter(r => r.enabled && r.action === 'tunnel').length,
-      block: rules.filter(r => r.enabled && r.action === 'block').length,
-    };
-  }, [config]);
-
-  const updateRules = (newRules: RouteRule[]) => {
-    setConfigs(prev => prev.map(c => c.group_id === selectedGroup ? { ...c, rules: newRules } : c));
+  const updateConfig = (updater: (current: RouteGroupConfig) => RouteGroupConfig) => {
+    setConfigs((prev) => prev.map((item) => (item.group_id === selectedGroup ? updater(item) : item)));
     setDirty(true);
-    setError(null);
-  };
-
-  const addRule = () => {
-    if (!config) return;
-    updateRules([...config.rules, {
-      id: `route-${Date.now()}`,
-      match_type: 'domain',
-      pattern: '',
-      action: 'bypass',
-      enabled: true,
-      comment: '',
-    }]);
-  };
-
-  const updateRule = (id: string, patch: Partial<RouteRule>) => {
-    if (!config) return;
-    updateRules(config.rules.map(r => r.id === id ? { ...r, ...patch } : r));
-  };
-
-  const removeRule = (id: string) => {
-    if (!config) return;
-    updateRules(config.rules.filter(r => r.id !== id));
+    setStatus(null);
   };
 
   const handleSave = async () => {
     if (!config) return;
+    setSaving(true);
     try {
-      setSaving(true);
-      setError(null);
-      const saved = await saveClientConfig(config.group_id, routeGroupToClientConfig(config));
-      const mapped = clientConfigToRouteGroup(saved);
-      setConfigs(prev => prev.map(c => c.group_id === selectedGroup ? mapped : c));
+      const payload = buildClientConfigPayload(config);
+      const saved = config.id
+        ? await saveClientConfig(config.group_id, payload)
+        : await createClientConfig(payload);
+      setConfigs((prev) => prev.map((item) => item.group_id === config.group_id ? toRouteGroupConfig(saved) : item));
       setDirty(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save route configuration');
+      setStatus({ type: 'success', message: 'Routing configuration saved successfully' });
+      setTimeout(() => setStatus(null), 3000);
+    } catch (error) {
+      setStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to save route configuration' });
     } finally {
       setSaving(false);
     }
   };
+
+  const stats = useMemo(() => {
+    if (!config) return { bypass: 0, exceptions: 0 };
+    const routing = config.routing_settings;
+    return {
+      bypass: routing.dns.bypass_domains.length + routing.traffic.bypass_processes.length + routing.traffic.bypass_domains.length + routing.traffic.bypass_networks.length,
+      exceptions: routing.dns.tunnel_exceptions.length + routing.traffic.tunnel_process_exceptions.length + routing.traffic.tunnel_domain_exceptions.length + routing.traffic.tunnel_network_exceptions.length,
+    };
+  }, [config]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Network className="text-purple-400" size={24} />
+            <Route className="text-purple-400" size={24} />
             Route Configuration
           </h1>
-          <p className="text-sm text-gray-400 mt-1">Configure DNS exceptions and traffic steering per client group.</p>
-          <p className="text-xs text-gray-500 mt-1">Saved rules are delivered to devices through the mTLS client runtime API.</p>
+          <p className="text-sm text-gray-400 mt-1">Define DNS routing, split tunnel bypass, and tunnel exceptions per client group.</p>
+          <p className="text-xs text-gray-500 mt-1">These settings are delivered to the desktop runtime after user authentication and device-to-user binding.</p>
         </div>
-        <div className="flex items-center gap-2">
-          {dirty && (
-            <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
-              <Save size={14} /> {saving ? 'Saving...' : `Save v${(config?.version ?? 0) + 1}`}
-            </button>
-          )}
-          <button onClick={addRule} disabled={!config} className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded-lg text-sm border border-gray-700 transition-colors">
-            <Plus size={14} /> Add Rule
+        {dirty && (
+          <button
+            onClick={handleSave}
+            disabled={saving || !config}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
+          >
+            {saving ? <Loader size={14} className="animate-spin" /> : <Save size={14} />}
+            {saving ? 'Saving...' : 'Save Changes'}
           </button>
-        </div>
+        )}
       </div>
 
-      {loading && <div className="text-sm text-gray-500">Loading client route configuration...</div>}
-      {error && <div className="p-3 rounded-lg bg-red-900/30 border border-red-800 text-sm text-red-300">{error}</div>}
+      {status && (
+        <div className={clsx('p-3 rounded-lg text-sm border', status.type === 'success' ? 'bg-green-900/30 border-green-800 text-green-300' : 'bg-red-900/30 border-red-800 text-red-300')}>
+          {status.message}
+        </div>
+      )}
 
       <div className="flex gap-2 flex-wrap">
-        {configs.map(c => (
-          <button key={c.group_id} onClick={() => { setSelectedGroup(c.group_id); setDirty(false); }} className={clsx(
-            'px-4 py-2 rounded-lg text-sm font-medium transition-colors border',
-            selectedGroup === c.group_id ? 'bg-purple-600 text-white border-purple-500' : 'bg-gray-900 text-gray-400 border-gray-800 hover:bg-gray-800 hover:text-gray-200'
-          )}>
+        {loading && <span className="text-sm text-gray-500">Loading groups...</span>}
+        {configs.map((item) => (
+          <button
+            key={item.group_id}
+            onClick={() => { setSelectedGroup(item.group_id); setDirty(false); }}
+            className={clsx(
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors border',
+              selectedGroup === item.group_id
+                ? 'bg-purple-600 text-white border-purple-500'
+                : 'bg-gray-900 text-gray-400 border-gray-800 hover:bg-gray-800 hover:text-gray-200'
+            )}
+          >
             <Users size={12} className="inline mr-1.5" />
-            {c.group_name}
-            <span className="ml-2 text-xs opacity-60">({c.rules.length})</span>
+            {item.group_name}
           </button>
         ))}
       </div>
 
       {config && (
         <>
-          <div className="flex gap-3">
-            <div className="px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-lg text-xs text-gray-400">Total Rules: <span className="text-white font-medium">{config.rules.length}</span></div>
-            <div className="px-3 py-1.5 bg-green-900/20 border border-green-900/30 rounded-lg text-xs text-green-400">Bypass: <span className="font-medium">{stats.bypass}</span></div>
-            <div className="px-3 py-1.5 bg-blue-900/20 border border-blue-900/30 rounded-lg text-xs text-blue-400">Tunnel: <span className="font-medium">{stats.tunnel}</span></div>
-            <div className="px-3 py-1.5 bg-red-900/20 border border-red-900/30 rounded-lg text-xs text-red-400">Block: <span className="font-medium">{stats.block}</span></div>
-            <div className="ml-auto px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-lg text-xs text-gray-500">Version: v{config.version}</div>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
+            {config.group_id !== 'default' && (
+              <>
+                <label htmlFor="route-config-priority">Group priority</label>
+                <input
+                  id="route-config-priority"
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={config.priority}
+                  onChange={(event) => updateConfig((current) => ({ ...current, priority: Number(event.target.value) || 100 }))}
+                  className="w-24 px-3 py-2 bg-gray-900 border border-gray-700 rounded-md text-gray-200"
+                />
+                <span>Lower numbers win when a user belongs to multiple groups.</span>
+              </>
+            )}
+            <span className="ml-auto px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-lg text-xs text-gray-500">Bypass entries: {stats.bypass}</span>
+            <span className="px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-lg text-xs text-gray-500">Tunnel exceptions: {stats.exceptions}</span>
           </div>
 
-          <div className="bg-gray-900/50 border border-gray-800 rounded-xl overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-800 text-left text-gray-500 text-xs uppercase tracking-wider">
-                  <th className="px-4 py-3 w-10">On</th>
-                  <th className="px-4 py-3 w-36">Match Type</th>
-                  <th className="px-4 py-3">Pattern</th>
-                  <th className="px-4 py-3 w-28">Action</th>
-                  <th className="px-4 py-3 w-28">Resolver</th>
-                  <th className="px-4 py-3">Comment</th>
-                  <th className="px-4 py-3 w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800/50">
-                {config.rules.map(rule => {
-                  const MtIcon = matchTypeIcons[rule.match_type] || Globe;
-                  return (
-                    <tr key={rule.id} className={clsx('transition-colors', rule.enabled ? 'hover:bg-gray-800/20' : 'opacity-50')}>
-                      <td className="px-4 py-2">
-                        <button onClick={() => updateRule(rule.id, { enabled: !rule.enabled })}>
-                          {rule.enabled ? <ToggleRight size={22} className="text-green-400" /> : <ToggleLeft size={22} className="text-gray-600" />}
-                        </button>
-                      </td>
-                      <td className="px-4 py-2">
-                        <select value={rule.match_type} onChange={e => updateRule(rule.id, { match_type: e.target.value as MatchType })} className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 focus:outline-none focus:border-blue-600">
-                          {Object.entries(matchTypeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                          <MtIcon size={12} className="text-gray-500 flex-shrink-0" />
-                          <input type="text" value={rule.pattern} onChange={e => updateRule(rule.id, { pattern: e.target.value })} placeholder="e.g. *.client.local or 10.50.0.0/16" className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 font-mono focus:outline-none focus:border-blue-600" />
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <select value={rule.action} onChange={e => updateRule(rule.id, { action: e.target.value as RouteAction })} className={clsx('w-full px-2 py-1.5 rounded text-xs font-medium border focus:outline-none', actionColors[rule.action])}>
-                          <option value="bypass">Bypass</option>
-                          <option value="tunnel">Tunnel</option>
-                          <option value="block">Block</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        {rule.match_type === 'dns_query' ? (
-                          <select value={rule.resolver ?? 'system'} onChange={e => updateRule(rule.id, { resolver: e.target.value as 'system' | 'gateway' })} className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200">
-                            <option value="system">System VPN DNS</option>
-                            <option value="gateway">Gateway DNS</option>
-                          </select>
-                        ) : <span className="text-xs text-gray-600">-</span>}
-                      </td>
-                      <td className="px-4 py-2">
-                        <input type="text" value={rule.comment} onChange={e => updateRule(rule.id, { comment: e.target.value })} placeholder="Description..." className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-600" />
-                      </td>
-                      <td className="px-4 py-2">
-                        <button onClick={() => removeRule(rule.id)} className="p-1 text-gray-600 hover:text-red-400 transition-colors">
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {config.rules.length === 0 && (
-              <div className="py-8 text-center text-sm text-gray-600">
-                <AlertTriangle size={20} className="mx-auto mb-2 text-yellow-400/50" />
-                No steering rules defined. Default behavior tunnels protected traffic through ApexAegis.
+          <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 space-y-6">
+            <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4">
+                <Shield size={14} className="text-blue-400" />
+                Routing Mode
+              </h3>
+              <div className="grid md:grid-cols-2 gap-3">
+                {([
+                  ['full_tunnel', 'Full tunnel', 'All traffic stays on the ApexAegis path unless explicitly bypassed for operations.'],
+                  ['split_tunnel', 'Split tunnel', 'Bypass lists are active and only selected traffic leaves outside the tunnel.'],
+                ] as const).map(([value, label, description]) => (
+                  <button
+                    key={value}
+                    onClick={() => updateConfig((current) => ({ ...current, routing_settings: { ...current.routing_settings, mode: value } }))}
+                    className={clsx(
+                      'text-left px-4 py-3 rounded-lg border transition-colors',
+                      config.routing_settings.mode === value
+                        ? 'bg-blue-600/15 border-blue-500/40 text-blue-200'
+                        : 'bg-gray-800/40 border-gray-700 text-gray-300 hover:bg-gray-800/70'
+                    )}
+                  >
+                    <div className="font-medium">{label}</div>
+                    <div className="text-xs text-gray-500 mt-1">{description}</div>
+                  </button>
+                ))}
               </div>
-            )}
+            </section>
+
+            <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4">
+                <Globe size={14} className="text-cyan-400" />
+                DNS Routing
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Tunnel DNS resolver</label>
+                  <input
+                    value={config.routing_settings.dns.resolver}
+                    onChange={(event) => updateConfig((current) => ({
+                      ...current,
+                      routing_settings: {
+                        ...current.routing_settings,
+                        dns: { ...current.routing_settings.dns, resolver: event.target.value },
+                      },
+                    }))}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200"
+                  />
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">DNS bypass domains, one per line</label>
+                    <textarea
+                      rows={6}
+                      value={textareaValue(config.routing_settings.dns.bypass_domains)}
+                      onChange={(event) => updateConfig((current) => ({
+                        ...current,
+                        routing_settings: {
+                          ...current.routing_settings,
+                          dns: { ...current.routing_settings.dns, bypass_domains: parseLines(event.target.value) },
+                        },
+                      }))}
+                      placeholder={'teams.microsoft.com\n*.zoom.us'}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">DNS tunnel exceptions, one per line</label>
+                    <textarea
+                      rows={6}
+                      value={textareaValue(config.routing_settings.dns.tunnel_exceptions)}
+                      onChange={(event) => updateConfig((current) => ({
+                        ...current,
+                        routing_settings: {
+                          ...current.routing_settings,
+                          dns: { ...current.routing_settings.dns, tunnel_exceptions: parseLines(event.target.value) },
+                        },
+                      }))}
+                      placeholder={'admin.teams.microsoft.com\nsecure.zoom.us'}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4">
+                <Network size={14} className="text-green-400" />
+                Split Tunnel / VPN Bypass
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Bypass processes</label>
+                  <textarea
+                    rows={6}
+                    value={textareaValue(config.routing_settings.traffic.bypass_processes)}
+                    onChange={(event) => updateConfig((current) => ({
+                      ...current,
+                      routing_settings: {
+                        ...current.routing_settings,
+                        traffic: { ...current.routing_settings.traffic, bypass_processes: parseLines(event.target.value) },
+                      },
+                    }))}
+                    placeholder={'teamviewer.exe\nzoom.exe'}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Bypass domains</label>
+                  <textarea
+                    rows={6}
+                    value={textareaValue(config.routing_settings.traffic.bypass_domains)}
+                    onChange={(event) => updateConfig((current) => ({
+                      ...current,
+                      routing_settings: {
+                        ...current.routing_settings,
+                        traffic: { ...current.routing_settings.traffic, bypass_domains: parseLines(event.target.value) },
+                      },
+                    }))}
+                    placeholder={'support.vendor.example\n*.teamviewer.com'}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Bypass networks (CIDR)</label>
+                  <textarea
+                    rows={6}
+                    value={textareaValue(config.routing_settings.traffic.bypass_networks)}
+                    onChange={(event) => updateConfig((current) => ({
+                      ...current,
+                      routing_settings: {
+                        ...current.routing_settings,
+                        traffic: { ...current.routing_settings.traffic, bypass_networks: parseLines(event.target.value) },
+                      },
+                    }))}
+                    placeholder={'10.20.0.0/16\n192.168.10.0/24'}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4">
+                <Shield size={14} className="text-amber-400" />
+                Tunnel Exceptions
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Tunnel process exceptions</label>
+                  <textarea
+                    rows={6}
+                    value={textareaValue(config.routing_settings.traffic.tunnel_process_exceptions)}
+                    onChange={(event) => updateConfig((current) => ({
+                      ...current,
+                      routing_settings: {
+                        ...current.routing_settings,
+                        traffic: { ...current.routing_settings.traffic, tunnel_process_exceptions: parseLines(event.target.value) },
+                      },
+                    }))}
+                    placeholder={'chrome.exe'}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Tunnel domain exceptions</label>
+                  <textarea
+                    rows={6}
+                    value={textareaValue(config.routing_settings.traffic.tunnel_domain_exceptions)}
+                    onChange={(event) => updateConfig((current) => ({
+                      ...current,
+                      routing_settings: {
+                        ...current.routing_settings,
+                        traffic: { ...current.routing_settings.traffic, tunnel_domain_exceptions: parseLines(event.target.value) },
+                      },
+                    }))}
+                    placeholder={'secure.zoom.us'}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Tunnel network exceptions</label>
+                  <textarea
+                    rows={6}
+                    value={textareaValue(config.routing_settings.traffic.tunnel_network_exceptions)}
+                    onChange={(event) => updateConfig((current) => ({
+                      ...current,
+                      routing_settings: {
+                        ...current.routing_settings,
+                        traffic: { ...current.routing_settings.traffic, tunnel_network_exceptions: parseLines(event.target.value) },
+                      },
+                    }))}
+                    placeholder={'10.20.10.0/24'}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-blue-900/20 border border-blue-800/30 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-blue-200 mb-2">Precedence</h3>
+              <div className="text-xs text-blue-300 space-y-1">
+                <div>1. Group priority decides which configuration a multi-group user receives.</div>
+                <div>2. Tunnel exceptions win over broader bypass intent when both are configured.</div>
+                <div>3. Exact domains should be preferred over broad wildcards for operator clarity.</div>
+              </div>
+            </section>
           </div>
 
           <div className="text-xs text-gray-600 flex items-center gap-4">
-            <span>Last updated by {config.updated_by || 'unknown'}</span>
-            <span>{config.updated_at ? new Date(config.updated_at).toLocaleString() : 'Never saved'}</span>
-            <span>Version: v{config.version}</span>
+            <span>{config.id ? `Last updated by ${config.updated_by}` : 'No saved routing configuration. Default steering will apply.'}</span>
+            {config.updated_at && <span>{new Date(config.updated_at).toLocaleString()}</span>}
           </div>
         </>
       )}
     </div>
   );
-}
-
-function clientConfigToRouteGroup(config: any): RouteGroupConfig {
-  const privateSettings = config.private_access_settings ?? {};
-  const routePolicies = Array.isArray(privateSettings.route_policies) ? privateSettings.route_policies : [];
-  const dnsExceptions = Array.isArray(privateSettings.dns_exceptions) ? privateSettings.dns_exceptions : [];
-  const rules: RouteRule[] = [
-    ...routePolicies.flatMap((rule: any, idx: number) => {
-      const patterns = Array.isArray(rule.patterns) ? rule.patterns : rule.pattern ? [rule.pattern] : [];
-      return patterns.map((pattern: string, pidx: number) => ({
-        id: pidx === 0 ? rule.id || `route-${idx}` : `${rule.id || `route-${idx}`}-${pidx}`,
-        match_type: normalizeMatchType(rule.match_type || rule.type),
-        pattern,
-        action: normalizeAction(rule.policy_action || rule.action),
-        enabled: rule.enabled !== false,
-        comment: rule.comment || rule.reason || rule.name || '',
-      }));
-    }),
-    ...dnsExceptions.flatMap((rule: any, idx: number) => {
-      const domains = Array.isArray(rule.domains) ? rule.domains : rule.pattern ? [rule.pattern] : [];
-      return domains.map((pattern: string, pidx: number) => ({
-        id: pidx === 0 ? rule.id || `dns-${idx}` : `${rule.id || `dns-${idx}`}-${pidx}`,
-        match_type: 'dns_query' as const,
-        pattern,
-        action: normalizeAction(rule.action),
-        enabled: rule.enabled !== false,
-        comment: rule.comment || rule.reason || rule.name || '',
-        resolver: rule.resolver === 'gateway' ? 'gateway' as const : 'system' as const,
-      }));
-    }),
-  ];
-
-  return {
-    group_id: config.group_id,
-    group_name: config.group_name,
-    version: config.version ?? 1,
-    rules,
-    updated_by: config.updated_by ?? '',
-    updated_at: config.updated_at ?? '',
-    source_config: config,
-  };
-}
-
-function routeGroupToClientConfig(group: RouteGroupConfig): any {
-  const base = group.source_config ?? {};
-  const privateSettings = { ...(base.private_access_settings ?? {}) };
-  privateSettings.route_policies = group.rules
-    .filter(rule => rule.match_type !== 'dns_query')
-    .map((rule, idx) => ({
-      id: rule.id || `route-${idx}`,
-      name: rule.comment || rule.id || `Route ${idx + 1}`,
-      match_type: rule.match_type,
-      patterns: [rule.pattern].filter(Boolean),
-      policy_action: rule.action,
-      enabled: rule.enabled,
-      priority: (idx + 1) * 10,
-      comment: rule.comment,
-    }));
-  privateSettings.dns_exceptions = group.rules
-    .filter(rule => rule.match_type === 'dns_query')
-    .map((rule, idx) => ({
-      id: rule.id || `dns-${idx}`,
-      name: rule.comment || rule.id || `DNS exception ${idx + 1}`,
-      domains: [rule.pattern].filter(Boolean),
-      action: rule.action,
-      resolver: rule.resolver ?? 'system',
-      enabled: rule.enabled,
-      priority: (idx + 1) * 10,
-      comment: rule.comment,
-    }));
-
-  return {
-    ...base,
-    group_id: group.group_id,
-    group_name: group.group_name,
-    private_access_settings: privateSettings,
-  };
-}
-
-function normalizeMatchType(value: string): MatchType {
-  if (value === 'process' || value === 'fqdn' || value === 'domain' || value === 'cidr' || value === 'url' || value === 'dns_query') return value;
-  if (value === 'ip') return 'cidr';
-  return 'domain';
-}
-
-function normalizeAction(value: string): RouteAction {
-  if (value === 'tunnel' || value === 'block') return value;
-  return 'bypass';
 }

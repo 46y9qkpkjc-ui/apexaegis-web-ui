@@ -36,6 +36,23 @@ export interface FeaturesSettings {
   log_forwarding: boolean;
 }
 
+export interface RoutingSettings {
+  mode: 'full_tunnel' | 'split_tunnel';
+  dns: {
+    resolver: string;
+    bypass_domains: string[];
+    tunnel_exceptions: string[];
+  };
+  traffic: {
+    bypass_processes: string[];
+    bypass_domains: string[];
+    bypass_networks: string[];
+    tunnel_process_exceptions: string[];
+    tunnel_domain_exceptions: string[];
+    tunnel_network_exceptions: string[];
+  };
+}
+
 export interface PrivateAccessSettings {
   machine_tunnel_enabled: boolean;
   mtls_enabled: boolean;
@@ -49,6 +66,7 @@ export interface InstallSettings {
   verify_app_domains: boolean;
   app_integrity_verification: boolean;
   auto_update: { enabled: boolean; auto_update_channel: 'stable' | 'beta' };
+  config_sync_interval_mins: number;
   revoke_on_token_deletion: boolean;
   debug_options: { enabled: boolean; log_level: string };
   otp_enforcement: { enabled: boolean };
@@ -71,6 +89,7 @@ interface ClientGroupConfig {
   priority: number;
   tunnel_settings: TunnelSettings;
   features_settings: FeaturesSettings;
+  routing_settings: RoutingSettings;
   private_access_settings: PrivateAccessSettings;
   install_settings: InstallSettings;
   tamperproof_settings: TamperproofSettings;
@@ -107,6 +126,18 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
     ssl_inspection: false,
     log_forwarding: true,
   },
+  routing_settings: {
+    mode: 'full_tunnel',
+    dns: { resolver: '100.64.0.1', bypass_domains: [], tunnel_exceptions: [] },
+    traffic: {
+      bypass_processes: [],
+      bypass_domains: [],
+      bypass_networks: [],
+      tunnel_process_exceptions: [],
+      tunnel_domain_exceptions: [],
+      tunnel_network_exceptions: [],
+    },
+  },
   private_access_settings: {
     machine_tunnel_enabled: true,
     mtls_enabled: true,
@@ -119,6 +150,7 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
     verify_app_domains: true,
     app_integrity_verification: true,
     auto_update: { enabled: true, auto_update_channel: 'stable' },
+    config_sync_interval_mins: 15,
     revoke_on_token_deletion: true,
     debug_options: { enabled: false, log_level: 'error' },
     otp_enforcement: { enabled: false },
@@ -178,6 +210,7 @@ function normalizeClientConfig(config: Partial<ClientGroupConfig> | null | undef
     group_name: base.group_name || DEFAULT_CONFIG.group_name,
     tunnel_settings: mergeObject(DEFAULT_CONFIG.tunnel_settings, base.tunnel_settings),
     features_settings: mergeObject(DEFAULT_CONFIG.features_settings, base.features_settings),
+    routing_settings: mergeObject(DEFAULT_CONFIG.routing_settings, base.routing_settings),
     private_access_settings: mergeObject(DEFAULT_CONFIG.private_access_settings, base.private_access_settings),
     install_settings: mergeObject(DEFAULT_CONFIG.install_settings, base.install_settings),
     tamperproof_settings: mergeObject(DEFAULT_CONFIG.tamperproof_settings, base.tamperproof_settings),
