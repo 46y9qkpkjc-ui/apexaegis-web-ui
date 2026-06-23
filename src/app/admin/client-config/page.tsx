@@ -26,9 +26,23 @@ export interface TunnelSettings {
   audit_logs: { disable_with_password: boolean; fail_close_logs: boolean; fail_open_logs: boolean };
 }
 
+export type DnsSecurityAction = 'allow' | 'deny';
+export interface DnsSecurityCategories {
+  nrd: DnsSecurityAction;
+  nod: DnsSecurityAction;
+  dga: DnsSecurityAction;
+  malicious: DnsSecurityAction;
+  spyware: DnsSecurityAction;
+}
+
 export interface FeaturesSettings {
   dlp: { enabled: boolean; usb_drives: boolean; printers: boolean; clipboard_copy_paste: boolean; screenshot_print_screen: boolean };
   dns_routing: { enabled: boolean; resolver: string; exceptions: string[] };
+  // DNS security: per-group L7 threat filtering. When dns_security is off the
+  // gateway applies no category blocking for the group (smart guard). When on,
+  // each category is allowed or denied; an unset category denies (fail-secure).
+  dns_security: boolean;
+  dns_security_categories: DnsSecurityCategories;
   split_tunnel_enabled: boolean;
   collab_optimization: boolean;
   other_vpn_bypass: boolean;
@@ -120,6 +134,8 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
   features_settings: {
     dlp: { enabled: false, usb_drives: false, printers: false, clipboard_copy_paste: false, screenshot_print_screen: false },
     dns_routing: { enabled: true, resolver: '100.64.0.1', exceptions: [] },
+    dns_security: false,
+    dns_security_categories: { nrd: 'deny', nod: 'deny', dga: 'deny', malicious: 'deny', spyware: 'deny' },
     split_tunnel_enabled: false,
     collab_optimization: false,
     other_vpn_bypass: false,
