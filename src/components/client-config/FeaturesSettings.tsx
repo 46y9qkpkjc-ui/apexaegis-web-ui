@@ -19,17 +19,58 @@ export function FeaturesSettingsComponent({ settings, onChange }: Props) {
   const update = <K extends keyof FeaturesSettings>(key: K, value: FeaturesSettings[K]) => onChange({ ...settings, [key]: value });
   const updateCategory = (key: keyof DnsSecurityCategories, action: DnsSecurityAction) =>
     update('dns_security_categories', { ...settings.dns_security_categories, [key]: action });
+  const updateDns = (patch: Partial<FeaturesSettings['dns_routing']>) => update('dns_routing', { ...settings.dns_routing, ...patch });
+  const toLines = (arr: string[]) => arr.join('\n');
+  const fromLines = (text: string) => text.split('\n');
   const switchKeys: Array<[keyof FeaturesSettings, string]> = [['split_tunnel_enabled','Split tunnel'],['collab_optimization','Collaboration optimization'],['other_vpn_bypass','Other VPN bypass'],['log_forwarding','Export client logs']];
   const toggle = (value: boolean, action: () => void) => <button type="button" onClick={action}>{value ? <ToggleRight size={28} className="text-green-400" /> : <ToggleLeft size={28} className="text-gray-600" />}</button>;
   return <div className="space-y-6">
     <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-      <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4"><Route size={14} className="text-cyan-400" />Routing Ownership</h3>
-      <div className="space-y-3 text-sm text-gray-300">
-        <p>DNS routing, split tunnel bypass lists, and tunnel inclusions are managed from the Route Configuration page so steering rules stay separate from endpoint behavior.</p>
-        <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-3 text-xs text-gray-400">
-          The desktop client does not perform SSL inspection locally. TLS inspection is enforced on the gateway path, so there is no endpoint SSL inspection toggle here.
-        </div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2"><Route size={14} className="text-cyan-400" />DNS Forwarding</h3>
+        {toggle(settings.dns_routing.enabled, () => updateDns({ enabled: !settings.dns_routing.enabled }))}
       </div>
+      <p className="text-xs text-gray-400 mb-3">
+        Routes this group&apos;s DNS through the tunnel resolver for visibility and policy. <span className="text-gray-300">Exceptions</span> resolve directly on the physical network (split DNS); <span className="text-gray-300">inclusions</span> are always forced through the tunnel, even under split tunnel. When off, members resolve directly with no tunnel resolver.
+      </p>
+      {settings.dns_routing.enabled ? (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Tunnel resolver</label>
+            <input
+              type="text"
+              value={settings.dns_routing.resolver}
+              onChange={(e) => updateDns({ resolver: e.target.value })}
+              placeholder="100.64.0.1"
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Exceptions — resolve directly, bypass the tunnel (one domain per line)</label>
+            <textarea
+              value={toLines(settings.dns_routing.exceptions ?? [])}
+              onChange={(e) => updateDns({ exceptions: fromLines(e.target.value) })}
+              rows={3}
+              placeholder={'internal.corp.example\nprinter.local'}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono text-gray-200 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Inclusions — always force through the tunnel (one domain per line)</label>
+            <textarea
+              value={toLines(settings.dns_routing.inclusions ?? [])}
+              onChange={(e) => updateDns({ inclusions: fromLines(e.target.value) })}
+              rows={3}
+              placeholder={'app.saas.example'}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono text-gray-200 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-3 text-xs text-gray-500">
+          DNS forwarding is off. This group&apos;s DNS resolves directly on the physical network — no tunnel resolver, exceptions, or inclusions apply.
+        </div>
+      )}
     </section>
     <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
       <div className="flex items-center justify-between mb-2">
@@ -37,7 +78,7 @@ export function FeaturesSettingsComponent({ settings, onChange }: Props) {
         {toggle(settings.dns_security, () => update('dns_security', !settings.dns_security))}
       </div>
       <p className="text-xs text-gray-400 mb-3">
-        Forwards this group&apos;s DNS through the tunnel for Layer-7 threat filtering. When off, no category blocking is applied and members resolve normally. Route Configuration DNS exceptions still egress the physical network even while this is on.
+        Forwards this group&apos;s DNS through the tunnel for Layer-7 threat filtering. When off, no category blocking is applied and members resolve normally. DNS Forwarding exceptions still egress the physical network even while this is on.
       </p>
       {settings.dns_security ? (
         <div className="space-y-1">

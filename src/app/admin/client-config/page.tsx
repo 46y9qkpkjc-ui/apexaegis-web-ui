@@ -37,7 +37,7 @@ export interface DnsSecurityCategories {
 
 export interface FeaturesSettings {
   dlp: { enabled: boolean; usb_drives: boolean; printers: boolean; clipboard_copy_paste: boolean; screenshot_print_screen: boolean };
-  dns_routing: { enabled: boolean; resolver: string; exceptions: string[] };
+  dns_routing: { enabled: boolean; resolver: string; exceptions: string[]; inclusions: string[] };
   // DNS security: per-group L7 threat filtering. When dns_security is off the
   // gateway applies no category blocking for the group (smart guard). When on,
   // each category is allowed or denied; an unset category denies (fail-secure).
@@ -133,7 +133,7 @@ const DEFAULT_CONFIG: ClientGroupConfig = {
   },
   features_settings: {
     dlp: { enabled: false, usb_drives: false, printers: false, clipboard_copy_paste: false, screenshot_print_screen: false },
-    dns_routing: { enabled: true, resolver: '100.64.0.1', exceptions: [] },
+    dns_routing: { enabled: true, resolver: '100.64.0.1', exceptions: [], inclusions: [] },
     dns_security: false,
     dns_security_categories: { nrd: 'deny', nod: 'deny', dga: 'deny', malicious: 'deny', spyware: 'deny' },
     split_tunnel_enabled: false,
@@ -437,6 +437,7 @@ export default function ClientConfigPage() {
         )}
         {activeSection === 'tamper' && (
           <TamperproofSettingsComponent
+            key={config.group_id}
             settings={config.tamperproof_settings}
             onChange={(settings) => updateConfig((c) => ({ ...c, tamperproof_settings: settings }))}
           />

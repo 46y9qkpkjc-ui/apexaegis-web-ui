@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Globe, Loader, Network, Route, Save, Shield, Users } from 'lucide-react';
+import { Loader, Network, Route, Save, Shield, Users } from 'lucide-react';
 import { clsx } from 'clsx';
 import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
@@ -14,11 +14,6 @@ interface ApiGroup {
 
 interface RoutingSettings {
   mode: 'full_tunnel' | 'split_tunnel';
-  dns: {
-    resolver: string;
-    bypass_domains: string[];
-    tunnel_exceptions: string[];
-  };
   traffic: {
     bypass_processes: string[];
     bypass_domains: string[];
@@ -42,11 +37,6 @@ interface RouteGroupConfig {
 
 const DEFAULT_ROUTING_SETTINGS: RoutingSettings = {
   mode: 'full_tunnel',
-  dns: {
-    resolver: '100.64.0.1',
-    bypass_domains: [],
-    tunnel_exceptions: [],
-  },
   traffic: {
     bypass_processes: [],
     bypass_domains: [],
@@ -74,7 +64,7 @@ const DEFAULT_CLIENT_CONFIG_PAYLOAD: any = {
   },
   features_settings: {
     dlp: { enabled: false, usb_drives: false, printers: false, clipboard_copy_paste: false, screenshot_print_screen: false },
-    dns_routing: { enabled: true, resolver: '100.64.0.1', exceptions: [] },
+    dns_routing: { enabled: true, resolver: '100.64.0.1', exceptions: [], inclusions: [] },
     split_tunnel_enabled: false,
     collab_optimization: false,
     other_vpn_bypass: false,
@@ -156,8 +146,6 @@ function isCIDRLike(value: string): boolean {
 function normalizeRoutingSettings(config: any): RoutingSettings {
   if (config?.routing_settings) {
     const routing = mergeObject(DEFAULT_ROUTING_SETTINGS, config.routing_settings);
-    routing.dns.bypass_domains = uniqueLines(routing.dns.bypass_domains);
-    routing.dns.tunnel_exceptions = uniqueLines(routing.dns.tunnel_exceptions);
     routing.traffic.bypass_processes = uniqueLines(routing.traffic.bypass_processes);
     routing.traffic.bypass_domains = uniqueLines(routing.traffic.bypass_domains);
     routing.traffic.bypass_networks = uniqueLines(routing.traffic.bypass_networks);
@@ -168,9 +156,6 @@ function normalizeRoutingSettings(config: any): RoutingSettings {
   }
 
   const routing = structuredClone(DEFAULT_ROUTING_SETTINGS);
-  const featureDns = config?.features_settings?.dns_routing;
-  if (featureDns?.resolver) routing.dns.resolver = featureDns.resolver;
-  routing.dns.bypass_domains.push(...asArray<string>(featureDns?.exceptions));
 
   const consumeRule = (rule: any) => {
     const action = String(rule?.policy_action || rule?.action || 'bypass').toLowerCase();
@@ -181,11 +166,7 @@ function normalizeRoutingSettings(config: any): RoutingSettings {
       ...(typeof rule?.pattern === 'string' ? [rule.pattern] : []),
     ]);
     for (const pattern of patterns) {
-      if (matchType === 'dns_query') {
-        if (action === 'tunnel') routing.dns.tunnel_exceptions.push(pattern);
-        else routing.dns.bypass_domains.push(pattern);
-        continue;
-      }
+      if (matchType === 'dns_query') continue; // DNS forwarding/exceptions are managed in Client Config
       if (matchType === 'process') {
         if (action === 'tunnel') routing.traffic.tunnel_process_exceptions.push(pattern);
         else routing.traffic.bypass_processes.push(pattern);
@@ -203,10 +184,7 @@ function normalizeRoutingSettings(config: any): RoutingSettings {
 
   for (const rule of asArray<any>(config?.private_access_settings?.route_policies)) consumeRule(rule);
   for (const rule of asArray<any>(config?.private_access_settings?.traffic_bypass)) consumeRule(rule);
-  for (const rule of asArray<any>(config?.private_access_settings?.dns_exceptions)) consumeRule(rule);
 
-  routing.dns.bypass_domains = uniqueLines(routing.dns.bypass_domains);
-  routing.dns.tunnel_exceptions = uniqueLines(routing.dns.tunnel_exceptions);
   routing.traffic.bypass_processes = uniqueLines(routing.traffic.bypass_processes);
   routing.traffic.bypass_domains = uniqueLines(routing.traffic.bypass_domains);
   routing.traffic.bypass_networks = uniqueLines(routing.traffic.bypass_networks);
@@ -242,11 +220,6 @@ function buildClientConfigPayload(config: RouteGroupConfig) {
   base.features_settings = {
     ...base.features_settings,
     split_tunnel_enabled: routing.mode === 'split_tunnel',
-    dns_routing: {
-      enabled: routing.dns.bypass_domains.length > 0 || routing.dns.tunnel_exceptions.length > 0 || Boolean(routing.dns.resolver),
-      resolver: routing.dns.resolver,
-      exceptions: routing.dns.bypass_domains,
-    },
   };
   base.private_access_settings = {
     ...base.private_access_settings,
@@ -336,8 +309,8 @@ export default function RouteConfigPage() {
     if (!config) return { bypass: 0, exceptions: 0 };
     const routing = config.routing_settings;
     return {
-      bypass: routing.dns.bypass_domains.length + routing.traffic.bypass_processes.length + routing.traffic.bypass_domains.length + routing.traffic.bypass_networks.length,
-      exceptions: routing.dns.tunnel_exceptions.length + routing.traffic.tunnel_process_exceptions.length + routing.traffic.tunnel_domain_exceptions.length + routing.traffic.tunnel_network_exceptions.length,
+      bypass: routing.traffic.bypass_processes.length + routing.traffic.bypass_domains.length + routing.traffic.bypass_networks.length,
+      exceptions: routing.traffic.tunnel_process_exceptions.length + routing.traffic.tunnel_domain_exceptions.length + routing.traffic.tunnel_network_exceptions.length,
     };
   }, [config]);
 
@@ -349,7 +322,7 @@ export default function RouteConfigPage() {
             <Route className="text-purple-400" size={24} />
             Route Configuration
           </h1>
-          <p className="text-sm text-gray-400 mt-1">Define DNS routing, split tunnel bypass, and tunnel inclusions per client group.</p>
+          <p className="text-sm text-gray-400 mt-1">Define split tunnel mode, bypass lists, and tunnel inclusions per client group. DNS forwarding &amp; exceptions are managed in Client Configuration.</p>
           <p className="text-xs text-gray-500 mt-1">These settings are delivered to the desktop runtime after user authentication and device-to-user binding.</p>
         </div>
         {dirty && (
@@ -436,63 +409,6 @@ export default function RouteConfigPage() {
                     <div className="text-xs text-gray-500 mt-1">{description}</div>
                   </button>
                 ))}
-              </div>
-            </section>
-
-            <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-4">
-                <Globe size={14} className="text-cyan-400" />
-                DNS Routing
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Tunnel DNS resolver</label>
-                  <input
-                    value={config.routing_settings.dns.resolver}
-                    onChange={(event) => updateConfig((current) => ({
-                      ...current,
-                      routing_settings: {
-                        ...current.routing_settings,
-                        dns: { ...current.routing_settings.dns, resolver: event.target.value },
-                      },
-                    }))}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200"
-                  />
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">DNS bypass domains, one per line, comma, or semicolon</label>
-                    <textarea
-                      rows={6}
-                      value={textareaValue(config.routing_settings.dns.bypass_domains)}
-                      onChange={(event) => updateConfig((current) => ({
-                        ...current,
-                        routing_settings: {
-                          ...current.routing_settings,
-                          dns: { ...current.routing_settings.dns, bypass_domains: parseLines(event.target.value) },
-                        },
-                      }))}
-                      placeholder={'teams.microsoft.com\n*.zoom.us'}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">DNS tunnel inclusions, one per line, comma, or semicolon</label>
-                    <textarea
-                      rows={6}
-                      value={textareaValue(config.routing_settings.dns.tunnel_exceptions)}
-                      onChange={(event) => updateConfig((current) => ({
-                        ...current,
-                        routing_settings: {
-                          ...current.routing_settings,
-                          dns: { ...current.routing_settings.dns, tunnel_exceptions: parseLines(event.target.value) },
-                        },
-                      }))}
-                      placeholder={'admin.teams.microsoft.com\nsecure.zoom.us'}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-mono text-gray-200"
-                    />
-                  </div>
-                </div>
               </div>
             </section>
 
