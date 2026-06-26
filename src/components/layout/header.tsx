@@ -23,7 +23,7 @@ const demoNotifications: Notification[] = [
   { id: 'n2', type: 'warning', title: 'SSL Certificate Expiring', message: 'Wildcard cert *.apexaegis.io expires in 14 days. Renew via CA Certificates page.', time: '18 min ago', read: false },
   { id: 'n3', type: 'critical', title: 'DRKey Session Failure', message: 'ISD-202 (DBS Bank) DRKey derivation timed out — SCION peering degraded.', time: '45 min ago', read: false },
   { id: 'n4', type: 'info', title: 'Policy Migration Complete', message: 'Legacy firewall → ApexAegis migration batch #7 completed. 42 rules imported.', time: '1 hr ago', read: true },
-  { id: 'n5', type: 'success', title: 'Gateway Node Online', message: 'EverNewNode SG-03 (Singtel Singapore) is now operational. Latency: 1.2ms.', time: '2 hr ago', read: true },
+  { id: 'n5', type: 'success', title: 'Gateway Node Online', message: 'NextGenNodes SG-03 (Singtel Singapore) is now operational. Latency: 1.2ms.', time: '2 hr ago', read: true },
   { id: 'n6', type: 'warning', title: 'UEBA Anomaly Detected', message: 'User jsmith@acme.com accessed 340 files in 5 minutes — risk score elevated to 87.', time: '3 hr ago', read: true },
   { id: 'n7', type: 'info', title: 'OAuth Client Registered', message: 'New client "SIEM-Splunk-v2" registered with scopes: logs:read, events:read.', time: '5 hr ago', read: true },
 ];

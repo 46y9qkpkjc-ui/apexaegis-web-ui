@@ -13,6 +13,7 @@ interface GatewayNode {
   name: string;
   region: string;
   location: string;
+  kind: 'internet' | 'private';
   status: 'healthy' | 'degraded' | 'offline';
   publicIp: string;
   version: string;
@@ -58,6 +59,7 @@ function fromApi(gw: ApiGateway): GatewayNode {
     name: gw.name || `gw-${gw.id}`,
     region: gw.location || gw.region,
     location: gw.id,
+    kind: gw.deploy_mode === 'private-access' ? 'private' : 'internet',
     status: statusMap[gw.status] ?? 'offline',
     publicIp: gw.public_host,
     version: gw.version || '1.0.0',
@@ -244,6 +246,93 @@ function CpuBar({ value }: { value: number }) {
   );
 }
 
+function GatewayCard({ gw, onToggle }: { gw: GatewayNode; onToggle: () => void }) {
+  const st = statusConfig[gw.status];
+  const StatusIcon = st.icon;
+  return (
+    <div className={`bg-gray-900 border rounded-xl p-5 ${gw.adminDisabled ? 'border-red-800/50 opacity-60' : 'border-gray-800'} ${gw.status === 'offline' && !gw.adminDisabled ? 'opacity-50' : ''}`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Server size={18} className="text-emerald-400" />
+          <div>
+            <h3 className="font-semibold font-mono text-sm">{gw.name}</h3>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <MapPin size={10} /> {gw.region}
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${st.bg} ${st.color}`}>
+                <StatusIcon size={10} />
+                {st.label}
+              </span>
+              {gw.mtlsIssued && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-emerald-900/30 text-emerald-400 border-emerald-800">
+                  <Lock size={10} /> mTLS
+                </span>
+              )}
+              {gw.adminDisabled && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-red-900/40 text-red-400 border-red-800">
+                  <Ban size={10} /> Admin Disabled
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggle}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              gw.adminDisabled
+                ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-800'
+                : 'bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-800'
+            }`}
+            title={gw.adminDisabled ? 'Re-enable this gateway for user connections' : 'Disable this gateway — users will not be able to connect'}
+          >
+            <Power size={12} />
+            {gw.adminDisabled ? 'Enable' : 'Disable'}
+          </button>
+        </div>
+        <div className="text-right text-xs text-gray-500">
+          <div>Heartbeat: <span className="text-gray-300">{gw.lastHeartbeat}</span></div>
+          <div>Uptime: <span className="text-gray-300">{gw.uptime}</span></div>
+        </div>
+      </div>
+
+      {gw.adminDisabled && gw.disableReason && (
+        <div className="mb-3 px-3 py-2 bg-red-900/20 border border-red-800/30 rounded-lg text-xs text-red-300 flex items-center gap-2">
+          <Ban size={12} className="shrink-0" /> <span className="text-gray-400">Reason:</span> {gw.disableReason}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+        <div className="p-3 bg-gray-800/30 rounded-lg">
+          <div className="text-xs text-gray-500 mb-1">Public IP</div>
+          <span className="text-xs text-gray-300 font-mono">{gw.publicIp}</span>
+        </div>
+        <div className="p-3 bg-gray-800/30 rounded-lg">
+          <div className="text-xs text-gray-500 mb-1">Version</div>
+          <span className="text-xs text-gray-300 font-mono">{gw.version}</span>
+        </div>
+        <div className="p-3 bg-gray-800/30 rounded-lg">
+          <div className="text-xs text-gray-500 mb-1">CPU</div>
+          <CpuBar value={gw.cpu} />
+        </div>
+        <div className="p-3 bg-gray-800/30 rounded-lg">
+          <div className="text-xs text-gray-500 mb-1">Memory</div>
+          <CpuBar value={gw.memory} />
+        </div>
+        <div className="p-3 bg-gray-800/30 rounded-lg">
+          <div className="text-xs text-gray-500 mb-1">Tunnels</div>
+          <span className="text-sm text-gray-300 font-medium">{gw.tunnels}</span>
+        </div>
+        <div className="p-3 bg-gray-800/30 rounded-lg">
+          <div className="text-xs text-gray-500 mb-1">Throughput</div>
+          <span className="text-sm text-gray-300 font-medium">{gw.throughput}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type ActiveTab = 'gateways' | 'backbone' | 'scion';
 
 export default function GatewayNodesPage() {
@@ -306,7 +395,7 @@ export default function GatewayNodesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header — EverNewNode branding */}
+      {/* Header — NextGenNodes branding */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -315,7 +404,7 @@ export default function GatewayNodesPage() {
           </div>
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2">
-              EverNewNode
+              NextGenNodes
               <span className="text-xs font-normal px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 border border-emerald-800">Singtel Backbone</span>
             </h1>
             <p className="text-sm text-gray-500">
@@ -381,8 +470,8 @@ export default function GatewayNodesPage() {
         )}
       </div>
 
-      {/* Gateway cards */}
-      <div className="grid grid-cols-1 gap-4">
+      {/* Gateway cards — grouped by type (Private Access vs Internet) */}
+      <div className="space-y-6">
         {loading && gateways.length === 0 && (
           <div className="flex items-center justify-center py-16 text-gray-500">
             <RefreshCw size={20} className="animate-spin mr-2" /> Loading gateways...
@@ -395,92 +484,27 @@ export default function GatewayNodesPage() {
             <p className="text-xs mt-1 text-gray-600">Gateways auto-register every 30 seconds.</p>
           </div>
         )}
-        {gateways.map(gw => {
-          const st = statusConfig[gw.status];
-          const StatusIcon = st.icon;
-          return (
-            <div key={gw.id} className={`bg-gray-900 border rounded-xl p-5 ${gw.adminDisabled ? 'border-red-800/50 opacity-60' : 'border-gray-800'} ${gw.status === 'offline' && !gw.adminDisabled ? 'opacity-50' : ''}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <Server size={18} className="text-emerald-400" />
-                  <div>
-                    <h3 className="font-semibold font-mono text-sm">{gw.name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="flex items-center gap-1 text-xs text-gray-400">
-                        <MapPin size={10} /> {gw.region}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${st.bg} ${st.color}`}>
-                        <StatusIcon size={10} />
-                        {st.label}
-                      </span>
-                      {gw.mtlsIssued && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-emerald-900/30 text-emerald-400 border-emerald-800">
-                          <Lock size={10} /> mTLS
-                        </span>
-                      )}
-                      {gw.adminDisabled && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-red-900/40 text-red-400 border-red-800">
-                          <Ban size={10} /> Admin Disabled
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setDisableModal({ gwId: gw.id, action: gw.adminDisabled ? 'enable' : 'disable' })}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      gw.adminDisabled
-                        ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-800'
-                        : 'bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-800'
-                    }`}
-                    title={gw.adminDisabled ? 'Re-enable this gateway for user connections' : 'Disable this gateway — users will not be able to connect'}
-                  >
-                    <Power size={12} />
-                    {gw.adminDisabled ? 'Enable' : 'Disable'}
-                  </button>
-                </div>
-                <div className="text-right text-xs text-gray-500">
-                  <div>Heartbeat: <span className="text-gray-300">{gw.lastHeartbeat}</span></div>
-                  <div>Uptime: <span className="text-gray-300">{gw.uptime}</span></div>
-                </div>
-              </div>
-
-              {gw.adminDisabled && gw.disableReason && (
-                <div className="mb-3 px-3 py-2 bg-red-900/20 border border-red-800/30 rounded-lg text-xs text-red-300 flex items-center gap-2">
-                  <Ban size={12} className="shrink-0" /> <span className="text-gray-400">Reason:</span> {gw.disableReason}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-                <div className="p-3 bg-gray-800/30 rounded-lg">
-                  <div className="text-xs text-gray-500 mb-1">Public IP</div>
-                  <span className="text-xs text-gray-300 font-mono">{gw.publicIp}</span>
-                </div>
-                <div className="p-3 bg-gray-800/30 rounded-lg">
-                  <div className="text-xs text-gray-500 mb-1">Version</div>
-                  <span className="text-xs text-gray-300 font-mono">{gw.version}</span>
-                </div>
-                <div className="p-3 bg-gray-800/30 rounded-lg">
-                  <div className="text-xs text-gray-500 mb-1">CPU</div>
-                  <CpuBar value={gw.cpu} />
-                </div>
-                <div className="p-3 bg-gray-800/30 rounded-lg">
-                  <div className="text-xs text-gray-500 mb-1">Memory</div>
-                  <CpuBar value={gw.memory} />
-                </div>
-                <div className="p-3 bg-gray-800/30 rounded-lg">
-                  <div className="text-xs text-gray-500 mb-1">Tunnels</div>
-                  <span className="text-sm text-gray-300 font-medium">{gw.tunnels}</span>
-                </div>
-                <div className="p-3 bg-gray-800/30 rounded-lg">
-                  <div className="text-xs text-gray-500 mb-1">Throughput</div>
-                  <span className="text-sm text-gray-300 font-medium">{gw.throughput}</span>
-                </div>
-              </div>
+        {[
+          { key: 'private', label: 'Private Access Gateways', icon: Shield, gws: gateways.filter(g => g.kind === 'private') },
+          { key: 'internet', label: 'Internet Gateways', icon: Globe, gws: gateways.filter(g => g.kind === 'internet') },
+        ].filter(grp => grp.gws.length > 0).map(grp => (
+          <div key={grp.key} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <grp.icon size={16} className="text-emerald-400" />
+              <h2 className="text-sm font-semibold text-gray-200">{grp.label}</h2>
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-400">{grp.gws.length}</span>
             </div>
-          );
-        })}
+            <div className="grid grid-cols-1 gap-4">
+              {grp.gws.map(gw => (
+                <GatewayCard
+                  key={gw.id}
+                  gw={gw}
+                  onToggle={() => setDisableModal({ gwId: gw.id, action: gw.adminDisabled ? 'enable' : 'disable' })}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
         </>/* end gateways tab */
       )}

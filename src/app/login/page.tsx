@@ -441,7 +441,7 @@ export default function LoginPage() {
           <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
             Zero-trust network access, SCION path-aware routing with AegisRoute™,
             advanced threat protection and unified security policy management —
-            powered by the EverNewNode global backbone.
+            powered by the NextGenNodes global backbone.
           </p>
         </div>
 
