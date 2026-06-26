@@ -45,7 +45,15 @@ interface ApiDevice {
 
 interface DeviceDetail {
   device: ApiDevice;
-  posture?: { checked_at: string; compliant: boolean; score: number; disk_encrypted: boolean; firewall_enabled: boolean; antivirus_running: boolean; antivirus_name: string; os_version: string };
+  posture?: {
+    checked_at: string; compliant: boolean; score: number; disk_encrypted: boolean; firewall_enabled: boolean;
+    antivirus_running: boolean; antivirus_name: string; os_version: string;
+    raw?: {
+      applications?: Array<{ name: string; publisher?: string; version?: string; category?: string; risk?: string; purpose?: string; running?: boolean; flags?: string[] }>;
+      running_processes?: Array<{ pid: number; name: string; path?: string; risk?: string; purpose?: string; flags?: string[] }>;
+      ghost_app_count?: number; high_risk_app_count?: number; application_scan_at?: string;
+    };
+  };
   logs: Array<{ logged_at: string; level: string; source: string; message: string }>;
 }
 
@@ -491,6 +499,22 @@ export default function DevicesPage() {
               <Score label="Antivirus" value={deviceDetail.posture?.antivirus_running ? deviceDetail.posture.antivirus_name || 'Running' : 'Non-compliant'} ok={Boolean(deviceDetail.posture?.antivirus_running)} />
             </div>
             <div className="text-xs text-gray-500 mb-2">Last posture check: {formatTime(deviceDetail.posture?.checked_at)}</div>
+            {deviceDetail.posture?.raw?.applications && (
+              <div className="mb-5 border border-gray-800 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-gray-950/60 border-b border-gray-800 flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">Third-party application inventory</h4>
+                  <span className="text-xs text-gray-500">
+                    {deviceDetail.posture.raw.applications.length} apps · {deviceDetail.posture.raw.ghost_app_count || 0} ghosted · {deviceDetail.posture.raw.high_risk_app_count || 0} high risk
+                  </span>
+                </div>
+                <div className="max-h-64 overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-gray-900"><tr className="text-left text-gray-500"><th className="p-2">Application</th><th className="p-2">Purpose</th><th className="p-2">Publisher</th><th className="p-2">Risk</th></tr></thead>
+                    <tbody>{deviceDetail.posture.raw.applications.map((app, index) => <tr key={`${app.name}-${index}`} className="border-t border-gray-800"><td className="p-2 text-gray-200">{app.name}{app.running ? <span className="ml-2 text-emerald-400">Running</span> : null}</td><td className="p-2 text-gray-400">{app.purpose || 'Third-party application'}</td><td className="p-2 text-gray-400">{app.publisher || 'Unknown'}</td><td className={`p-2 ${app.risk === 'High' || app.risk === 'Critical' ? 'text-red-400' : app.risk === 'Medium' ? 'text-amber-400' : 'text-gray-400'}`}>{app.risk || 'Unknown'}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             <h4 className="text-sm font-semibold mb-2">Recent client logs</h4>
             <div className="border border-gray-800 rounded-lg max-h-72 overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-gray-900"><tr className="text-left text-gray-500"><th className="p-2">Time</th><th className="p-2">Source</th><th className="p-2">Message</th></tr></thead><tbody>{deviceDetail.logs.map((log, index) => <tr key={`${log.logged_at}-${index}`} className="border-t border-gray-800"><td className="p-2 whitespace-nowrap text-gray-500">{formatTime(log.logged_at)}</td><td className="p-2 text-cyan-400">{log.source}</td><td className="p-2 font-mono text-gray-300 break-all">{log.message}</td></tr>)}{deviceDetail.logs.length === 0 && <tr><td colSpan={3} className="p-6 text-center text-gray-500">No client logs have been uploaded yet.</td></tr>}</tbody></table></div>
           </>}
