@@ -17,9 +17,9 @@ interface PolicyEditorProps {
   existingPolicies?: PolicyFingerprint[];
 }
 
-// URL categories, groups, and users load live from the API (see effect below).
-// The lists here are only offline fallbacks; device groups + cloud apps are still
-// seeded until wired to their own object endpoints.
+// All object lists (URL categories, user groups, users, device groups, cloud apps)
+// load live from the API in the effect below. The constants here are only offline
+// fallbacks used if a call fails.
 const availableUserGroups = ['All Users', 'Engineering', 'Product', 'Sales', 'HR', 'Finance Users', 'IT Admins', 'Domain Users'];
 const availableUsers = ['mark.anderson', 'sarah.lee', 'john.tan', 'priya.n', 'admin'];
 const availableDeviceGroups = ['All Devices', 'Managed Devices', 'BYOD', 'Mobile', 'Kiosk'];
@@ -85,6 +85,8 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
   const [urlCategoryOptions, setUrlCategoryOptions] = useState<string[]>(FALLBACK_URL_CATEGORIES);
   const [groupOptions, setGroupOptions] = useState<string[]>(availableUserGroups);
   const [userOptions, setUserOptions] = useState<string[]>(availableUsers);
+  const [deviceGroupOptions, setDeviceGroupOptions] = useState<string[]>(availableDeviceGroups);
+  const [cloudAppOptions, setCloudAppOptions] = useState<string[]>(availableCloudApps);
   const [creatingType, setCreatingType] = useState<CreatingType>(null);
 
   const isInternet = trafficSteering === 'internet';
@@ -99,10 +101,12 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
     const token = useAuthStore.getState().accessToken;
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     (async () => {
-      const [catRes, grpRes, usrRes] = await Promise.allSettled([
+      const [catRes, grpRes, usrRes, appRes, dgRes] = await Promise.allSettled([
         fetch(apiUrl('/api/v1/objects/url-categories'), { headers }),
         fetch(apiUrl('/api/v1/groups'), { headers }),
         fetch(apiUrl('/api/v1/client-users'), { headers }),
+        fetch(apiUrl('/api/v1/objects/cloud-apps'), { headers }),
+        fetch(apiUrl('/api/v1/objects/device-groups'), { headers }),
       ]);
       if (cancelled) return;
       if (catRes.status === 'fulfilled' && catRes.value.ok) {
@@ -120,6 +124,16 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
         const arr = Array.isArray(d) ? d : (d.client_users ?? d.users ?? []);
         const names = arr.map((u: any) => u.name || u.email).filter(Boolean);
         if (!cancelled && names.length) setUserOptions(names);
+      }
+      if (appRes.status === 'fulfilled' && appRes.value.ok) {
+        const d = await appRes.value.json();
+        const names = (d.cloud_apps ?? []).map((a: any) => a.name).filter(Boolean);
+        if (!cancelled && names.length) setCloudAppOptions(names);
+      }
+      if (dgRes.status === 'fulfilled' && dgRes.value.ok) {
+        const d = await dgRes.value.json();
+        const names = (d.device_groups ?? []).map((g: any) => g.name).filter(Boolean);
+        if (!cancelled && names.length) setDeviceGroupOptions(names);
       }
     })().catch(() => { /* keep fallback lists */ });
     return () => { cancelled = true; };
@@ -249,7 +263,7 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
               </div>
             </Field>
             <Field label="Device Groups (optional)">
-              <MultiSelect selected={sourceDeviceGroups} options={availableDeviceGroups} onChange={setSourceDeviceGroups} onCreateNew={() => setCreatingType('device-group')} />
+              <MultiSelect selected={sourceDeviceGroups} options={deviceGroupOptions} onChange={setSourceDeviceGroups} onCreateNew={() => setCreatingType('device-group')} />
             </Field>
           </Section>
 
@@ -278,7 +292,7 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
                   <span className="text-sm text-gray-400">Match by cloud application</span>
                 </div>
                 {matchCloudApp && (
-                  <MultiSelect selected={destCloudApps} options={availableCloudApps} onChange={setDestCloudApps} onCreateNew={() => setCreatingType('cloud-app')} />
+                  <MultiSelect selected={destCloudApps} options={cloudAppOptions} onChange={setDestCloudApps} onCreateNew={() => setCreatingType('cloud-app')} />
                 )}
               </>
             )}
