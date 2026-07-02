@@ -126,6 +126,7 @@ function formatLoginTime(dt: string | null): string {
 export default function UsersGroupsPage() {
   const [tab, setTab] = useState<'admins' | 'clients' | 'groups'>('admins');
   const [search, setSearch] = useState('');
+  const [showAvailable, setShowAvailable] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [clientUsers, setClientUsers] = useState<ClientUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -211,6 +212,11 @@ export default function UsersGroupsPage() {
   const filteredGroups = groups.filter(g =>
     g.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Limit the Groups view: show local/SCIM groups + imported AD groups by default;
+  // the (usually many) unimported AD groups are tucked behind an expander.
+  const availableAdGroups = filteredGroups.filter(g => g.source === 'ldap' && !g.importEnabled);
+  const visibleGroups = filteredGroups.filter(g => g.source !== 'ldap' || g.importEnabled || showAvailable);
 
   // Build reverse map: userId → group names (works for both admin and client users)
   const userIdToGroups = groups.reduce<Record<string, string[]>>((acc, group) => {
@@ -568,8 +574,9 @@ export default function UsersGroupsPage() {
 
       {/* Groups tab */}
       {tab === 'groups' && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredGroups.map(group => (
+          {visibleGroups.map(group => (
             <div key={group.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -627,10 +634,20 @@ export default function UsersGroupsPage() {
               )}
             </div>
           ))}
-          {filteredGroups.length === 0 && (
-            <div className="col-span-2 text-center py-12 text-gray-500 text-sm">No groups found. Groups are synced via SCIM or created locally.</div>
+          {visibleGroups.length === 0 && (
+            <div className="col-span-2 text-center py-12 text-gray-500 text-sm">No active groups yet. Import an AD group below, or create a local group.</div>
           )}
         </div>
+        {availableAdGroups.length > 0 && (
+          <button
+            onClick={() => setShowAvailable(v => !v)}
+            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900/60 border border-gray-800 rounded-lg text-sm text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            {showAvailable ? 'Hide' : 'Show'} {availableAdGroups.length} directory group{availableAdGroups.length !== 1 ? 's' : ''} available to import
+            <span className="text-xs">{showAvailable ? '▲' : '▼'}</span>
+          </button>
+        )}
+        </>
       )}
 
       {/* Client User Status History Modal */}
