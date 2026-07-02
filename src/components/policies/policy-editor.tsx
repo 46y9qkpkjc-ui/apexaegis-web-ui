@@ -17,8 +17,9 @@ interface PolicyEditorProps {
   existingPolicies?: PolicyFingerprint[];
 }
 
-// Object lists. URL categories load live from the API (see effect below); the rest
-// are seeded here until wired to their own object endpoints.
+// URL categories, groups, and users load live from the API (see effect below).
+// The lists here are only offline fallbacks; device groups + cloud apps are still
+// seeded until wired to their own object endpoints.
 const availableUserGroups = ['All Users', 'Engineering', 'Product', 'Sales', 'HR', 'Finance Users', 'IT Admins', 'Domain Users'];
 const availableUsers = ['mark.anderson', 'sarah.lee', 'john.tan', 'priya.n', 'admin'];
 const availableDeviceGroups = ['All Devices', 'Managed Devices', 'BYOD', 'Mobile', 'Kiosk'];
@@ -82,25 +83,45 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
   const [ackNonCompliant, setAckNonCompliant] = useState<boolean>(false);
 
   const [urlCategoryOptions, setUrlCategoryOptions] = useState<string[]>(FALLBACK_URL_CATEGORIES);
+  const [groupOptions, setGroupOptions] = useState<string[]>(availableUserGroups);
+  const [userOptions, setUserOptions] = useState<string[]>(availableUsers);
   const [creatingType, setCreatingType] = useState<CreatingType>(null);
 
   const isInternet = trafficSteering === 'internet';
   const isPrivate = trafficSteering === 'private_access';
   const isDns = trafficSteering === 'dns';
 
-  // Load real URL categories (from the objects API built in Bucket 3).
+  // Load real objects: URL categories (Bucket 3), directory groups (AD ldap +
+  // Okta SCIM + local), and the synced client users. Fallback lists stay if a
+  // call fails so the wizard is always usable.
   useEffect(() => {
     let cancelled = false;
+    const token = useAuthStore.getState().accessToken;
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     (async () => {
-      try {
-        const token = useAuthStore.getState().accessToken;
-        const res = await fetch(apiUrl('/api/v1/objects/url-categories'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-        if (!res.ok) return;
-        const data = await res.json();
-        const names = (data.categories ?? []).map((c: any) => c.name).filter(Boolean);
+      const [catRes, grpRes, usrRes] = await Promise.allSettled([
+        fetch(apiUrl('/api/v1/objects/url-categories'), { headers }),
+        fetch(apiUrl('/api/v1/groups'), { headers }),
+        fetch(apiUrl('/api/v1/client-users'), { headers }),
+      ]);
+      if (cancelled) return;
+      if (catRes.status === 'fulfilled' && catRes.value.ok) {
+        const d = await catRes.value.json();
+        const names = (d.categories ?? []).map((c: any) => c.name).filter(Boolean);
         if (!cancelled && names.length) setUrlCategoryOptions(names);
-      } catch { /* keep fallback list */ }
-    })();
+      }
+      if (grpRes.status === 'fulfilled' && grpRes.value.ok) {
+        const d = await grpRes.value.json();
+        const names = (d.groups ?? []).map((g: any) => g.display_name).filter(Boolean);
+        if (!cancelled && names.length) setGroupOptions(names);
+      }
+      if (usrRes.status === 'fulfilled' && usrRes.value.ok) {
+        const d = await usrRes.value.json();
+        const arr = Array.isArray(d) ? d : (d.client_users ?? d.users ?? []);
+        const names = arr.map((u: any) => u.name || u.email).filter(Boolean);
+        if (!cancelled && names.length) setUserOptions(names);
+      }
+    })().catch(() => { /* keep fallback lists */ });
     return () => { cancelled = true; };
   }, []);
 
@@ -204,7 +225,7 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
           {/* Source */}
           <Section title="Source">
             <Field label="Groups">
-              <MultiSelect selected={sourceUserGroups} options={availableUserGroups} onChange={setSourceUserGroups} onCreateNew={() => setCreatingType('user-group')} />
+              <MultiSelect selected={sourceUserGroups} options={groupOptions} onChange={setSourceUserGroups} onCreateNew={() => setCreatingType('user-group')} />
             </Field>
             <div className="flex items-center gap-2">
               <Toggle checked={specifyUsers} onChange={setSpecifyUsers} />
@@ -212,7 +233,7 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
             </div>
             {specifyUsers && (
               <Field label="Users">
-                <MultiSelect selected={sourceUsers} options={availableUsers} onChange={setSourceUsers} onCreateNew={() => setCreatingType('user-group')} />
+                <MultiSelect selected={sourceUsers} options={userOptions} onChange={setSourceUsers} onCreateNew={() => setCreatingType('user-group')} />
               </Field>
             )}
             <Field label="Device Posture">
