@@ -62,6 +62,7 @@ const navGroups: NavGroup[] = [
       { href: '/identity/users', icon: Users, label: 'Users & Groups' },
       { href: '/identity/devices', icon: MonitorSmartphone, label: 'Devices' },
       { href: '/identity/providers', icon: Key, label: 'Identity Providers' },
+      { href: '/admin/ad-connector', icon: Server, label: 'AD Connector' },
       { href: '/admin/abac', icon: Shield, label: 'ABAC Control' },
       { href: '/admin/oauth-api', icon: Key, label: 'OAuth 2.0 & API Keys' },
     ],
