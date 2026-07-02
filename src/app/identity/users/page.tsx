@@ -50,6 +50,7 @@ interface Group {
   memberCount: number;
   description: string;
   source: string;
+  importEnabled: boolean;
   members: string[];
 }
 
@@ -58,6 +59,7 @@ interface ApiGroup {
   display_name: string;
   external_id?: string;
   source?: string;
+  import_enabled?: boolean;
   members?: string[];
 }
 
@@ -83,6 +85,23 @@ const sourceBadge: Record<string, string> = {
   okta: 'text-blue-400',
   azure_ad: 'text-cyan-400',
   'azure-ad': 'text-cyan-400',
+  ldap: 'text-cyan-400',
+  'ad-connector': 'text-cyan-400',
+  connector: 'text-cyan-400',
+  scim: 'text-blue-400',
+};
+
+// Human label for an identity store / provisioning source.
+const sourceLabel: Record<string, string> = {
+  'ad-connector': 'AD Connector',
+  connector: 'AD Connector',
+  ldap: 'AD Connector',
+  azure_ad: 'Azure AD',
+  'azure-ad': 'Azure AD',
+  okta: 'Okta',
+  local: 'Local',
+  scim: 'SCIM',
+  '': 'SCIM',
 };
 
 function getAuthHeaders(): Record<string, string> {
@@ -121,7 +140,7 @@ export default function UsersGroupsPage() {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newUser, setNewUser] = useState<User>({ id: '', name: '', email: '', role: 'user', groups: [], status: 'active', mfa_enabled: false, last_login_at: null, oauth_provider: '', created_at: null });
-  const [newGroup, setNewGroup] = useState<Group>({ id: '', name: '', memberCount: 0, description: '', source: 'local', members: [] });
+  const [newGroup, setNewGroup] = useState<Group>({ id: '', name: '', memberCount: 0, description: '', source: 'local', importEnabled: false, members: [] });
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -144,8 +163,11 @@ export default function UsersGroupsPage() {
           id: group.id,
           name: group.display_name,
           memberCount: group.members?.length ?? 0,
-          description: group.source === 'scim' ? 'Provisioned and managed by your identity provider' : 'Locally managed group',
+          description: group.source === 'scim' ? 'Provisioned and managed by your identity provider'
+            : group.source === 'ldap' ? 'Synced from Active Directory (AD Connector)'
+            : 'Locally managed group',
           source: group.source || 'local',
+          importEnabled: group.import_enabled ?? false,
           members: group.members ?? [],
         })));
       }
@@ -153,7 +175,28 @@ export default function UsersGroupsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    fetchUsers();
+    // Auto-refresh so directory onboarding/offboarding shows up without a manual reload.
+    const id = setInterval(fetchUsers, 30000);
+    return () => clearInterval(id);
+  }, [fetchUsers]);
+
+  // Toggle whether an AD (ldap) group is imported — provisions/deprovisions its members.
+  async function toggleImport(group: Group) {
+    setActionError('');
+    try {
+      const res = await fetch(apiUrl(`/api/v1/groups/${group.id}/import`), {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ import_enabled: !group.importEnabled }),
+      });
+      if (!res.ok) { setActionError('Failed to update group import'); return; }
+      await fetchUsers();
+    } catch {
+      setActionError('Failed to update group import');
+    }
+  }
 
   const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -244,7 +287,7 @@ export default function UsersGroupsPage() {
       });
       if (res.ok) await fetchUsers();
     } catch { /* silent */ }
-    setNewGroup({ id: '', name: '', memberCount: 0, description: '', source: 'local', members: [] });
+    setNewGroup({ id: '', name: '', memberCount: 0, description: '', source: 'local', importEnabled: false, members: [] });
     setShowCreateGroup(false);
   };
 
@@ -489,7 +532,7 @@ export default function UsersGroupsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium ${sourceBadge[user.oauth_provider] || 'text-gray-400'}`}>{user.oauth_provider || 'SCIM'}</span>
+                    <span className={`text-xs font-medium ${sourceBadge[user.oauth_provider] || 'text-gray-400'}`}>{sourceLabel[user.oauth_provider] ?? (user.oauth_provider || 'SCIM')}</span>
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{formatLoginTime(user.created_at)}</td>
                   <td className="px-4 py-3 text-right">
@@ -537,7 +580,19 @@ export default function UsersGroupsPage() {
                   {group.source === 'scim' && (
                     <span className="px-1.5 py-0.5 rounded bg-blue-900/20 text-blue-400 text-xs border border-blue-800/40">IdP managed</span>
                   )}
-                  {group.source !== 'scim' && (
+                  {group.source === 'ldap' && (
+                    <>
+                      <span className="px-1.5 py-0.5 rounded bg-cyan-900/20 text-cyan-400 text-xs border border-cyan-800/40">AD Connector</span>
+                      <button
+                        onClick={() => toggleImport(group)}
+                        title={group.importEnabled ? 'Imported — provisioning members. Click to stop importing and offboard them.' : 'Not imported. Click to import and onboard members into the organization.'}
+                        className={`px-2 py-0.5 rounded text-xs border transition-colors ${group.importEnabled ? 'bg-green-900/30 text-green-400 border-green-800' : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-gray-200'}`}
+                      >
+                        {group.importEnabled ? 'Imported ✓' : 'Import'}
+                      </button>
+                    </>
+                  )}
+                  {group.source !== 'scim' && group.source !== 'ldap' && (
                     <>
                       <button onClick={() => setEditGroup({ ...group, members: group.members })} className="p-1 text-gray-500 hover:text-blue-400 transition-colors"><Pencil size={14} /></button>
                       <button onClick={() => handleDeleteGroup(group.id)} className="p-1 text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
