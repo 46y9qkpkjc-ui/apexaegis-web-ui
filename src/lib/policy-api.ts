@@ -19,6 +19,7 @@ export interface ApiPolicy {
   source_devices: string[];
   source_device_groups: string[];
   source_addresses: any;
+  source_device_posture?: string;
   dest_addresses: any;
   dest_cloud_apps: any;
   dest_url_categories: string[];
@@ -49,10 +50,11 @@ export function toApiPolicy(p: any): Partial<ApiPolicy> {
     traffic_steering: Array.isArray(p.trafficSteering) ? p.trafficSteering : [p.trafficSteering],
     access_methods: p.accessMethod ?? [],
     source_users: p.sourceUsers ?? [],
-    source_user_groups: [],
+    source_user_groups: p.sourceUserGroups ?? [],
     source_devices: [],
     source_device_groups: p.sourceDeviceGroups ?? [],
-    source_addresses: p.sourceAddresses ?? [],
+    source_device_posture: p.devicePosture ?? 'compliant',
+    source_addresses: [],
     dest_addresses: p.destAddresses ?? [],
     dest_cloud_apps: p.destCloudApps ?? [],
     dest_url_categories: p.destUrlCategories ?? [],
@@ -82,9 +84,12 @@ export function fromApiPolicy(p: ApiPolicy): any {
     trafficSteering: Array.isArray(p.traffic_steering) ? p.traffic_steering[0] ?? 'internet' : 'internet',
     accessMethod: p.access_methods ?? [],
     sourceUsers: p.source_users ?? [],
+    sourceUserGroups: p.source_user_groups ?? [],
+    devicePosture: p.source_device_posture ?? 'compliant',
     sourceDeviceGroups: p.source_device_groups ?? [],
     sourceAddresses: Array.isArray(p.source_addresses) ? p.source_addresses : [],
     destAddresses: Array.isArray(p.dest_addresses) ? p.dest_addresses : [],
+    destUrl: Array.isArray(p.dest_addresses) ? p.dest_addresses.filter((a: string) => a !== 'any').join(', ') : '',
     destCloudApps: Array.isArray(p.dest_cloud_apps) ? p.dest_cloud_apps : [],
     destUrlCategories: p.dest_url_categories ?? [],
     services: Array.isArray(p.services) ? p.services : [],
