@@ -61,6 +61,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/identity/users', icon: Users, label: 'Users & Groups' },
       { href: '/identity/devices', icon: MonitorSmartphone, label: 'Devices' },
+      { href: '/identity/device-enrolment', icon: Key, label: 'Device Enrolment' },
       { href: '/identity/providers', icon: Key, label: 'Identity Providers' },
       { href: '/admin/ad-connector', icon: Server, label: 'AD Connector' },
       { href: '/admin/abac', icon: Shield, label: 'ABAC Control' },
