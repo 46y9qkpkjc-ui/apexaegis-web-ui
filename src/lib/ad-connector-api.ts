@@ -40,6 +40,7 @@ export interface AdGroup {
   sid: string;
   name: string;
   sam_account_name: string;
+  sync_enabled: boolean;
 }
 
 function authHeaders(json = false): Record<string, string> {
@@ -90,4 +91,15 @@ export async function listConnectorGroups(search = '', id = AD_CONNECTOR_ID): Pr
   if (!res.ok) throw new Error(await readError(res, `Failed to load groups (HTTP ${res.status})`));
   const body = await res.json();
   return { groups: body.groups ?? [], total: body.total ?? 0 };
+}
+
+// setGroupSyncEnabled toggles whether a group flows into the system (is bridged
+// into native policy groups). The backend re-bridges immediately.
+export async function setGroupSyncEnabled(sid: string, enabled: boolean, id = AD_CONNECTOR_ID): Promise<void> {
+  const res = await fetch(apiUrl(`${base(id)}/groups/${encodeURIComponent(sid)}/sync`), {
+    method: 'PATCH',
+    headers: authHeaders(true),
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) throw new Error(await readError(res, `Failed to update group (HTTP ${res.status})`));
 }

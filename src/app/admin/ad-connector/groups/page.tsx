@@ -1,8 +1,8 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { Network, Search, ArrowLeft } from 'lucide-react';
-import { listConnectorGroups, type AdGroup } from '@/lib/ad-connector-api';
+import { Network, Search, ArrowLeft, Loader2 } from 'lucide-react';
+import { listConnectorGroups, setGroupSyncEnabled, type AdGroup } from '@/lib/ad-connector-api';
 
 export default function AdConnectorGroupsPage() {
   const [groups, setGroups] = useState<AdGroup[]>([]);
@@ -10,19 +10,34 @@ export default function AdConnectorGroupsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { groups, total } = await listConnectorGroups();
-        setGroups(groups);
-        setTotal(total);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load groups');
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const load = useCallback(async () => {
+    try {
+      const { groups, total } = await listConnectorGroups();
+      setGroups(groups);
+      setTotal(total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load groups');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggle = useCallback(async (g: AdGroup) => {
+    const next = !g.sync_enabled;
+    setSaving((s) => ({ ...s, [g.sid]: true }));
+    setGroups((gs) => gs.map((x) => (x.sid === g.sid ? { ...x, sync_enabled: next } : x))); // optimistic
+    try {
+      await setGroupSyncEnabled(g.sid, next);
+    } catch (err) {
+      setGroups((gs) => gs.map((x) => (x.sid === g.sid ? { ...x, sync_enabled: !next } : x))); // revert
+      setError(err instanceof Error ? err.message : 'Failed to update group');
+    } finally {
+      setSaving((s) => ({ ...s, [g.sid]: false }));
+    }
   }, []);
 
   const filtered = useMemo(() => {
@@ -32,6 +47,8 @@ export default function AdConnectorGroupsPage() {
       (g) => g.name.toLowerCase().includes(q) || g.sam_account_name.toLowerCase().includes(q),
     );
   }, [groups, search]);
+
+  const enabledCount = useMemo(() => groups.filter((g) => g.sync_enabled).length, [groups]);
 
   return (
     <div className="space-y-6">
@@ -43,7 +60,8 @@ export default function AdConnectorGroupsPage() {
           <Network size={22} className="text-blue-400" /> Synced AD Groups
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          {total} group{total === 1 ? '' : 's'} from the last directory sync. Read-only — sourced from Active Directory.
+          {total} group{total === 1 ? '' : 's'} from the last directory sync · <span className="text-green-400">{enabledCount} allowed to flow</span>.
+          Toggle which groups flow into the system — only enabled groups become policy groups and provision users.
         </p>
       </div>
 
@@ -70,6 +88,7 @@ export default function AdConnectorGroupsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-800 text-left text-xs text-gray-500 uppercase">
+                <th className="px-4 py-3 w-40 text-center">Flows into system</th>
                 <th className="px-4 py-3">Group</th>
                 <th className="px-4 py-3">sAMAccountName</th>
                 <th className="px-4 py-3">SID</th>
@@ -77,7 +96,18 @@ export default function AdConnectorGroupsPage() {
             </thead>
             <tbody>
               {filtered.map((g) => (
-                <tr key={g.sid} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+                <tr key={g.sid} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors ${g.sync_enabled ? '' : 'opacity-60'}`}>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => toggle(g)}
+                      disabled={saving[g.sid]}
+                      title={g.sync_enabled ? 'Allowed to flow — click to block' : 'Blocked — click to allow'}
+                      className={`relative inline-flex w-10 h-5 rounded-full transition-colors align-middle ${g.sync_enabled ? 'bg-green-600' : 'bg-gray-700'} ${saving[g.sid] ? 'opacity-50' : ''}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${g.sync_enabled ? 'translate-x-5' : ''}`} />
+                    </button>
+                    {saving[g.sid] && <Loader2 size={12} className="animate-spin inline ml-2 text-gray-500 align-middle" />}
+                  </td>
                   <td className="px-4 py-3 font-medium">{g.name}</td>
                   <td className="px-4 py-3 text-gray-400 font-mono">{g.sam_account_name || '—'}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{g.sid}</td>
