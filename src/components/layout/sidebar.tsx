@@ -1,9 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
 import { useFeatures } from '@/hooks/use-features';
+import { fetchTenantSummaries } from '@/lib/tenants-api';
+import { fetchEffectivePages, type EffectivePages } from '@/lib/rbac-api';
 import {
   Shield, Globe, Server, Users, Key, FileText,
   Settings, BarChart3, Network, Lock, Bug,
@@ -11,7 +13,7 @@ import {
   Activity, GitBranch, Router, Ghost, Wifi,
   Crosshair, Brain, Smartphone,
   ChevronRight, ChevronLeft, ShieldCheck, Award, Workflow,
-  ShieldAlert, Search, ShieldOff,
+  ShieldAlert, Search, ShieldOff, Building2,
 } from 'lucide-react';
 
 interface NavItem {
@@ -72,6 +74,7 @@ const navGroups: NavGroup[] = [
     label: 'Administration',
     items: [
       { href: '/audit', icon: FileText, label: 'Audit & Config Mgmt' },
+      { href: '/admin/rbac', icon: ShieldCheck, label: 'RBAC / Roles' },
       { href: '/admin/features', icon: Settings, label: 'Feature Licensing' },
       { href: '/admin/client-config', icon: Users, label: 'Client Config' },
       { href: '/admin/route-config', icon: Network, label: 'Route Policies' },
@@ -127,9 +130,65 @@ const navGroups: NavGroup[] = [
   },
 ];
 
+// Maps a nav href to its RBAC page slug (see migration 030 rbac_pages). Items
+// with no mapping (e.g. per-tenant links) are always shown.
+const hrefToSlug: Record<string, string> = {
+  '/': 'overview', '/logs': 'logs', '/endpoint-events': 'endpoint-events',
+  '/policies': 'policies', '/objects/addresses': 'addresses', '/objects/services': 'services',
+  '/objects/url-categories': 'url-categories', '/objects/cloud-apps': 'cloud-apps', '/objects/cloud-app-tenants': 'cloud-app-tenants',
+  '/profiles/atp': 'atp', '/profiles/ssl': 'ssl', '/profiles/dns': 'dns-filter', '/profiles/web': 'web-filter', '/profiles/device-posture': 'device-posture',
+  '/identity/users': 'users', '/identity/devices': 'devices', '/identity/device-enrolment': 'device-enrolment', '/identity/providers': 'identity-providers',
+  '/admin/ad-connector': 'ad-connector', '/admin/abac': 'abac', '/admin/oauth-api': 'oauth-api',
+  '/audit': 'audit', '/admin/rbac': 'rbac', '/admin/features': 'features', '/admin/client-config': 'client-config', '/admin/route-config': 'route-config',
+  '/security': 'attack-paths', '/security/attack-comparison': 'attack-comparison', '/security/ai-ueba': 'ai-ueba',
+  '/sdwan': 'sdwan', '/network-events': 'network-events', '/ghosted-apps': 'ghosted-apps',
+  '/security/test-my-defence': 'security-checkup', '/security/mitre-attack': 'apt-simulation', '/security/security-preview': 'security-preview',
+  '/security/attack-path': 'attack-path-analysis', '/security/ssl-scan': 'ssl-scanner',
+  '/compliance': 'compliance-report', '/compliance/certifications': 'certifications', '/compliance/itsm-automation': 'itsm-automation',
+  '/gateways': 'gateways', '/certificates': 'certificates', '/migration': 'policy-migration', '/settings': 'settings',
+};
+
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { isEnabled } = useFeatures();
+
+  // Dynamic per-tenant submenu — refreshes so newly onboarded tenants appear.
+  const [tenantItems, setTenantItems] = useState<NavItem[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => fetchTenantSummaries()
+      .then(list => {
+        if (alive) setTenantItems(list.map(t => ({
+          href: `/tenants/${t.tenant_id}`, icon: Building2, label: t.tenant_name,
+        })));
+      })
+      .catch(() => { /* backend unavailable */ });
+    load();
+    const id = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  // RBAC nav control — hide pages the current role can't view (keeps the menu
+  // from growing unbounded). controlled=false → show everything (super_admin).
+  const [effective, setEffective] = useState<EffectivePages>({ controlled: false, pages: [] });
+  useEffect(() => {
+    fetchEffectivePages().then(setEffective).catch(() => { /* show all on error */ });
+  }, []);
+
+  const rbacAllowed = (item: NavItem) => {
+    if (!effective.controlled) return true;
+    const slug = hrefToSlug[item.href];
+    if (!slug) return true;                          // structural / tenant links
+    if (slug === 'overview' || slug === 'rbac') return true; // never lock out of these
+    return effective.pages.includes(slug);
+  };
+
+  // Inject the Tenants group right after Dashboard.
+  const renderedGroups: NavGroup[] = [
+    navGroups[0],
+    { label: 'Tenants', items: tenantItems },
+    ...navGroups.slice(1),
+  ];
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // Track collapsed groups — Dashboard always open by default
@@ -163,9 +222,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2">
-        {navGroups.map((group) => {
+        {renderedGroups.map((group) => {
           const visibleItems = group.items.filter(
-            (item) => !item.featureId || isEnabled(item.featureId),
+            (item) => (!item.featureId || isEnabled(item.featureId)) && rbacAllowed(item),
           );
           if (visibleItems.length === 0) return null;
           const isCollapsed = collapsed.has(group.label);
@@ -240,14 +299,14 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </button>
       </div>
 
-      {/* Org selector */}
+      {/* Tenant scope — jump to the consolidated all-tenant overview */}
       <div className="p-3 border-t border-gray-800/60">
-        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/40 text-sm transition-all">
-          <div className="w-6 h-6 rounded bg-green-600/30 flex items-center justify-center text-xs font-bold text-green-400 flex-shrink-0">
-            O
+        <Link href="/" onClick={onNavigate} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/40 text-sm transition-all">
+          <div className="w-6 h-6 rounded bg-cyan-600/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
+            <Building2 size={13} />
           </div>
-          {!sidebarCollapsed && <span className="flex-1 text-left truncate text-gray-300">Organization</span>}
-        </button>
+          {!sidebarCollapsed && <span className="flex-1 text-left truncate text-gray-300">All Tenants</span>}
+        </Link>
       </div>
     </aside>
   );

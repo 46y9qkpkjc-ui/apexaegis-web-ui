@@ -141,9 +141,9 @@ export default function SettingsPage() {
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         {activeTab === 'general' && (
           <div className="space-y-5 max-w-lg">
-            <h3 className="text-sm font-semibold text-gray-300 mb-4">Organization Settings</h3>
+            <h3 className="text-sm font-semibold text-gray-300 mb-4">Tenant Settings</h3>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Organization Name</label>
+              <label className="block text-sm text-gray-400 mb-1">Tenant Name</label>
               <input value={general.orgName} onChange={e => setGeneral({ ...general, orgName: e.target.value })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500/50" />
             </div>
             <div>
@@ -301,7 +301,7 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm text-gray-400">Organization ID</label>
+                      <label className="block text-sm text-gray-400">Tenant ID</label>
                       <button
                         onClick={() => copyToClipboard(deployment.orgId, 'orgId')}
                         className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
