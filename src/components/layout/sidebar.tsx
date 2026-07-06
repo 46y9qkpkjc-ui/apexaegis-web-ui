@@ -135,6 +135,7 @@ const navGroups: NavGroup[] = [
     label: 'Infrastructure',
     items: [
       { href: '/gateways', icon: Server, label: 'Gateway Nodes' },
+      { href: '/admin/pdp-licensing', icon: Router, label: 'PDP Licensing' },
       { href: '/certificates', icon: Lock, label: 'CA Certificates' },
       { href: '/migration', icon: ArrowDownToLine, label: 'Policy Migration' },
       { href: '/settings', icon: Settings, label: 'Settings' },
@@ -226,10 +227,14 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2">
         {renderedGroups.map((group) => {
-          const visibleItems = group.items.filter(
-            // Premium items are shown (locked) rather than hidden by a feature flag.
-            (item) => (item.premium || !item.featureId || isEnabled(item.featureId)) && rbacAllowed(item),
-          );
+          const visibleItems = group.items.filter((item) => {
+            if (!rbacAllowed(item)) return false;
+            // Disabled premium features (not in the tenant's subscription) are HIDDEN
+            // until activated via Feature Licensing.
+            if (item.premium) return !isLocked(item);
+            if (item.featureId && !isEnabled(item.featureId)) return false;
+            return true;
+          });
           if (visibleItems.length === 0) return null;
           const isCollapsed = collapsed.has(group.label);
           const hasActive = isGroupActive(visibleItems);
@@ -266,26 +271,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 {visibleItems.map((item) => {
                   const Icon = item.icon;
                   const active = pathname === item.href;
-                  // Locked premium feature: not navigable to the page; routes to
-                  // Feature Licensing to subscribe/activate.
-                  if (isLocked(item)) {
-                    return (
-                      <Link
-                        key={item.href}
-                        href="/admin/features"
-                        onClick={onNavigate}
-                        title={`Subscribe to activate ${item.label}`}
-                        className={clsx(
-                          'flex items-center gap-3 mx-2 px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:text-gray-400 hover:bg-gray-800/30 transition-all',
-                          sidebarCollapsed && 'justify-center px-0',
-                        )}
-                      >
-                        <Icon size={15} className="flex-shrink-0 opacity-60" />
-                        {!sidebarCollapsed && <span className="truncate flex-1 opacity-70">{item.label}</span>}
-                        {!sidebarCollapsed && <Lock size={12} className="text-amber-500/70 flex-shrink-0" />}
-                      </Link>
-                    );
-                  }
                   return (
                     <Link
                       key={item.href}

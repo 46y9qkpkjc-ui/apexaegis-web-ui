@@ -4,7 +4,7 @@ import {
   Shield, Lock, Globe, Bug, Brain, Users,
   FileText, Layers,
   Search, ChevronDown, ChevronRight, ToggleLeft, ToggleRight,
-  Clock, Zap, CheckCircle2, XCircle,
+  Clock, Zap, CheckCircle2, XCircle, ShoppingCart, X, Check,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { fetchFeatures, toggleFeature, startTrial, type Feature } from '@/lib/feature-api';
@@ -38,7 +38,24 @@ export default function FeaturesPage() {
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [stateFilter, setStateFilter] = useState<string>('all');
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(() => new Set());
+  const [orderFeature, setOrderFeature] = useState<Feature | null>(null);
+  const [ordering, setOrdering] = useState(false);
   const { refresh } = useFeatures();
+
+  async function handlePlaceOrder() {
+    if (!orderFeature) return;
+    setOrdering(true);
+    try {
+      await toggleFeature(orderFeature.id, true); // order fulfilled -> feature activated
+      await load();
+      refresh();
+      setOrderFeature(null);
+    } catch (err) {
+      if (err instanceof Error) alert(err.message);
+    } finally {
+      setOrdering(false);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -221,10 +238,10 @@ export default function FeaturesPage() {
                         'flex items-center gap-4 px-4 py-3 transition-colors',
                         belowPlan ? 'opacity-60' : 'hover:bg-gray-800/20',
                       )}>
-                        {/* Toggle */}
+                        {/* Toggle — enabling a disabled feature opens the order modal */}
                         <button
-                          onClick={() => handleToggle(f.id)}
-                          disabled={belowPlan && !f.enabled}
+                          onClick={() => f.enabled ? handleToggle(f.id) : setOrderFeature(f)}
+                          title={f.enabled ? 'Disable' : 'Place order to activate'}
                           className="flex-shrink-0"
                         >
                           {f.enabled ? (
@@ -266,12 +283,14 @@ export default function FeaturesPage() {
                           </button>
                         )}
 
-                        {/* Lock icon if below plan */}
-                        {belowPlan && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600">
-                            <Lock size={12} />
-                            Upgrade
-                          </div>
+                        {/* Activate (order) for disabled features */}
+                        {!f.enabled && (
+                          <button
+                            onClick={() => setOrderFeature(f)}
+                            className="px-3 py-1.5 text-xs bg-cyan-900/30 text-cyan-300 border border-cyan-800 rounded-lg hover:bg-cyan-900/50 transition-colors flex items-center gap-1"
+                          >
+                            <ShoppingCart size={11} /> Activate
+                          </button>
                         )}
 
                         {/* Status */}
@@ -317,6 +336,38 @@ export default function FeaturesPage() {
           })}
         </div>
       </div>
+
+      {/* Order modal — activate a feature by placing an order */}
+      {orderFeature && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => !ordering && setOrderFeature(null)}>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl w-[440px] max-w-[92vw] p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-lg flex items-center gap-2"><ShoppingCart size={18} className="text-cyan-400" /> Activate Feature</h2>
+              <button onClick={() => !ordering && setOrderFeature(null)} className="text-gray-500 hover:text-gray-300"><X size={18} /></button>
+            </div>
+            <div className="bg-gray-800/40 border border-gray-800 rounded-lg p-3">
+              <div className="text-sm font-medium text-gray-200">{orderFeature.name}</div>
+              <p className="text-xs text-gray-500 mt-0.5">{orderFeature.description}</p>
+              <div className="mt-2 flex items-center gap-2 text-[11px]">
+                <span className={`px-1.5 py-0.5 rounded border ${planColors[orderFeature.min_plan]}`}>{orderFeature.min_plan} tier</span>
+                <span className="text-gray-500">Requires {orderFeature.min_plan} subscription</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">
+              Placing this order adds <strong className="text-gray-200">{orderFeature.name}</strong> to the tenant&apos;s
+              subscription and activates it across the console. Billing is prorated to the current cycle.
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setOrderFeature(null)} disabled={ordering}
+                className="text-sm px-3 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 disabled:opacity-50">Cancel</button>
+              <button onClick={handlePlaceOrder} disabled={ordering}
+                className="text-sm px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1.5 disabled:opacity-60">
+                {ordering ? 'Placing order…' : <><Check size={14} /> Place order &amp; activate</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
