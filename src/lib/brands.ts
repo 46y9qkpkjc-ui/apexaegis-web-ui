@@ -20,7 +20,7 @@ export const BRANDS: Record<string, Brand> = {
   starhub: { id: 'starhub', name: 'StarHub', initial: 'S', logoSvg: STARHUB_LOGO,
     ramp: { '50': '#e5f9f7', '100': '#c9f3e0', '300': '#6ee89a', '400': '#3ddf76', '500': '#1ed760', '600': '#17b34e', '700': '#0f8a3c' } },
   sptel: { id: 'sptel', name: 'SPtel', initial: 'SP',
-    ramp: { '300': '#5eead4', '400': '#2dd4bf', '500': '#14b8a6', '600': '#0d9488', '700': '#0f766e' } },
+    ramp: { '50': '#e0faf9', '100': '#c2f2ef', '300': '#a8f0ed', '400': '#77e6e2', '500': '#4fd4cf', '600': '#2ab8b3', '700': '#1a8f8b' } },
   singtel: { id: 'singtel', name: 'Singtel', initial: 'S',
     ramp: { '300': '#fca5a5', '400': '#f87171', '500': '#ef4444', '600': '#dc2626', '700': '#b91c1c' } },
   m1: { id: 'm1', name: 'M1', initial: 'M1',
