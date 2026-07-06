@@ -135,7 +135,7 @@ const navGroups: NavGroup[] = [
     label: 'Infrastructure',
     items: [
       { href: '/gateways', icon: Server, label: 'Gateway Nodes' },
-      { href: '/admin/pdp-licensing', icon: Router, label: 'PDP Licensing' },
+      { href: '/admin/pep-licensing', icon: Router, label: 'PEP Licensing' },
       { href: '/certificates', icon: Lock, label: 'CA Certificates' },
       { href: '/migration', icon: ArrowDownToLine, label: 'Policy Migration' },
       { href: '/settings', icon: Settings, label: 'Settings' },

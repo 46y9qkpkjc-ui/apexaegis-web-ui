@@ -34,7 +34,7 @@ const AWAY: CountryProv[] = [
 
 const MAX_LICENSED = 20; // gateway licensing from the tenant's tier
 
-export default function PDPLicensingPage() {
+export default function PEPLicensingPage() {
   const [home, setHome] = useState('SG');
   const [homePdps, setHomePdps] = useState(3);
   const [away, setAway] = useState<CountryProv[]>(AWAY);
@@ -53,15 +53,15 @@ export default function PDPLicensingPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Router className="text-cyan-400" size={24} /> PDP Licensing <span className="text-sm font-normal text-gray-500">(Gateway / Broker)</span>
+          <Router className="text-cyan-400" size={24} /> PEP Licensing <span className="text-sm font-normal text-gray-500">(Gateway / Broker)</span>
         </h1>
-        <p className="text-sm text-gray-400 mt-1">License and provision Policy Decision Points across countries — auto or manual per country.</p>
+        <p className="text-sm text-gray-400 mt-1">License and provision Policy Enforcement Points across countries — auto or manual per country.</p>
       </div>
 
       {/* License usage */}
       <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-400 flex items-center gap-2"><Server size={15} className="text-cyan-400" /> PDP licenses in use</span>
+          <span className="text-gray-400 flex items-center gap-2"><Server size={15} className="text-cyan-400" /> PEP licenses in use</span>
           <span className={clsx('font-mono', totalProvisioned > MAX_LICENSED ? 'text-red-400' : 'text-gray-200')}>{totalProvisioned} / {MAX_LICENSED}</span>
         </div>
         <div className="mt-2 h-2 bg-gray-800 rounded-full overflow-hidden">
@@ -79,7 +79,7 @@ export default function PDPLicensingPage() {
             {HOME_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
           </select>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">PDPs deployed:</span>
+            <span className="text-sm text-gray-400">PEPs deployed:</span>
             <button onClick={() => setHomePdps(n => Math.max(1, n - 1))} className="w-7 h-7 rounded bg-gray-800 border border-gray-700 hover:bg-gray-700 flex items-center justify-center"><Minus size={14} /></button>
             <span className="w-8 text-center font-mono text-gray-200">{homePdps}</span>
             <button onClick={() => setHomePdps(n => n + 1)} className="w-7 h-7 rounded bg-gray-800 border border-gray-700 hover:bg-gray-700 flex items-center justify-center"><Plus size={14} /></button>
@@ -90,7 +90,7 @@ export default function PDPLicensingPage() {
       {/* Away countries */}
       <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-800 text-sm font-semibold flex items-center gap-2">
-          <Globe size={16} className="text-cyan-400" /> Away Countries — provision PDPs
+          <Globe size={16} className="text-cyan-400" /> Away Countries — provision PEPs
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -98,7 +98,7 @@ export default function PDPLicensingPage() {
               <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-800">
                 <th className="text-left font-medium px-4 py-2">Country</th>
                 <th className="text-left font-medium px-4 py-2">Provisioning</th>
-                <th className="text-right font-medium px-4 py-2">PDPs</th>
+                <th className="text-right font-medium px-4 py-2">PEPs</th>
                 <th className="text-left font-medium px-4 py-2">Status</th>
               </tr>
             </thead>
