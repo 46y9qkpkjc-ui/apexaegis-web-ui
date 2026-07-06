@@ -225,7 +225,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo (skins to the active brand) */}
       <div className="h-14 px-4 flex items-center gap-3 border-b border-gray-800/60">
         {brand.logoSvg ? (
-          <span className="flex items-center flex-shrink-0 [&>svg]:h-8 [&>svg]:w-auto" dangerouslySetInnerHTML={{ __html: brand.logoSvg }} />
+          <span
+            className={clsx(
+              'flex items-center flex-shrink-0 [&>svg]:h-8 [&>svg]:w-auto',
+              brand.logoBg && 'bg-white rounded-md p-1 [&>svg]:h-6 overflow-hidden',
+            )}
+            dangerouslySetInnerHTML={{ __html: brand.logoSvg }} />
         ) : (
           <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center font-bold text-sm shadow-md shadow-cyan-600/20 flex-shrink-0">
             {brand.initial}
