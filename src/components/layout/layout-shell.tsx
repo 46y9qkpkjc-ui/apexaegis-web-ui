@@ -5,6 +5,7 @@ import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { TenantScopeInterceptor } from './tenant-scope-interceptor';
 import { TenantScopeBanner } from './tenant-scope-banner';
+import { useTenantContext } from '@/lib/tenant-context';
 import { FeatureProvider } from '@/hooks/use-features';
 import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
@@ -18,6 +19,8 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(!isAuth);
   const { accessToken, signOut } = useAuthStore();
+  const { active } = useTenantContext();
+  const activeTenantId = active?.id ?? 'all';
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +99,8 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <Header onMenuToggle={() => setMobileMenuOpen(prev => !prev)} />
         <TenantScopeBanner />
-        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-gray-950/50">
+        {/* Key by active tenant so pages re-mount and re-fetch scoped data on switch. */}
+        <main key={activeTenantId} className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-gray-950/50">
           {children}
         </main>
       </div>

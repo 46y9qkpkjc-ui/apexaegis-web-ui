@@ -1,15 +1,14 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import { Building2, ChevronDown, Layers, Check } from 'lucide-react';
 import { fetchTenantSummaries } from '@/lib/tenants-api';
 import { useTenantContext, type ActiveTenant } from '@/lib/tenant-context';
 
 // TenantSwitcher sets the active tenant that scopes the console. Selecting a
-// tenant navigates to its dashboard; "All Tenants" returns to the consolidated view.
+// tenant re-scopes the CURRENT page in place (no navigation); the scope banner
+// and all pages reflect the selected tenant.
 export function TenantSwitcher() {
-  const router = useRouter();
   const { active, setActive } = useTenantContext();
   const [tenants, setTenants] = useState<ActiveTenant[]>([]);
   const [open, setOpen] = useState(false);
@@ -35,7 +34,6 @@ export function TenantSwitcher() {
   const select = (t: ActiveTenant | null) => {
     setActive(t);
     setOpen(false);
-    router.push(t ? `/tenants/${t.id}` : '/');
   };
 
   return (

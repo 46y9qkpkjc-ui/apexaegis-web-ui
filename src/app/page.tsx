@@ -1,6 +1,5 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { clsx } from 'clsx';
 import {
   Building2, Shield, Users, AlertTriangle, ChevronRight, Layers,
@@ -8,8 +7,11 @@ import {
 import { fetchTenantSummaries, fetchGhostedApps, type TenantSummary, type GhostedApp } from '@/lib/tenants-api';
 import { GhostedAppsCard } from '@/components/dashboard/ghosted-apps-card';
 import { ReportToolbar } from '@/components/dashboard/report-toolbar';
+import { TenantDashboard } from '@/components/dashboard/tenant-dashboard';
+import { useTenantContext } from '@/lib/tenant-context';
 
 export default function OverviewPage() {
+  const { active, setActive } = useTenantContext();
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [ghosted, setGhosted] = useState<GhostedApp[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,12 @@ export default function OverviewPage() {
     }),
     { clientUsers: 0, policies: 0, devices: 0, blocked: 0 },
   ), [tenants]);
+
+  // When a tenant is active in the switcher, the home page shows that tenant's
+  // dashboard (consistent with the scope banner) instead of the consolidated view.
+  if (active) {
+    return <TenantDashboard tenantId={active.id} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -115,9 +123,10 @@ export default function OverviewPage() {
               {tenants.map(t => (
                 <tr key={t.tenant_id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
                   <td className="px-4 py-2.5">
-                    <Link href={`/tenants/${t.tenant_id}`} className="font-medium text-gray-200 hover:text-cyan-400 flex items-center gap-2">
+                    <button onClick={() => setActive({ id: t.tenant_id, name: t.tenant_name })}
+                      className="font-medium text-gray-200 hover:text-cyan-400 flex items-center gap-2">
                       <Building2 size={13} className="text-gray-500" /> {t.tenant_name}
-                    </Link>
+                    </button>
                   </td>
                   <td className="px-4 py-2.5 font-mono text-[11px] text-gray-500">{t.tenant_id}</td>
                   <td className="px-4 py-2.5">
@@ -136,9 +145,10 @@ export default function OverviewPage() {
                     <span className={clsx('font-mono', t.dns_blocked > 0 ? 'text-red-400' : 'text-gray-500')}>{t.dns_blocked}</span>
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    <Link href={`/tenants/${t.tenant_id}`} className="text-gray-500 hover:text-cyan-400 inline-flex">
+                    <button onClick={() => setActive({ id: t.tenant_id, name: t.tenant_name })}
+                      className="text-gray-500 hover:text-cyan-400 inline-flex">
                       <ChevronRight size={16} />
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               ))}
