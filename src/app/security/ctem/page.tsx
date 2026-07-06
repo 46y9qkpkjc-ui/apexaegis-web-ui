@@ -4,10 +4,12 @@ import { clsx } from 'clsx';
 import { Radar, AlertTriangle } from 'lucide-react';
 
 const findings = [
+  { exposure: 'Environment variables leaked (.env with DB credentials in build artifact)', sev: 'critical', assets: 4, vector: 'Secrets / data leak', status: 'open' },
+  { exposure: 'API key exposed in client bundle / public repository', sev: 'critical', assets: 2, vector: 'Secrets / data leak', status: 'open' },
   { exposure: 'Internet-exposed RDP on 3 hosts', sev: 'critical', assets: 3, vector: 'External attack surface', status: 'open' },
   { exposure: 'Unpatched CVE-2026-46333 (kernel 5.15)', sev: 'high', assets: 27, vector: 'Privilege escalation', status: 'mitigating' },
+  { exposure: 'Over-permissive S3 bucket policy (public read)', sev: 'high', assets: 2, vector: 'Data exposure', status: 'open' },
   { exposure: 'Legacy TLS 1.0 accepted at edge', sev: 'medium', assets: 5, vector: 'Downgrade', status: 'open' },
-  { exposure: 'Over-permissive S3 bucket policy', sev: 'high', assets: 2, vector: 'Data exposure', status: 'open' },
   { exposure: 'Stale admin accounts (>90d inactive)', sev: 'medium', assets: 14, vector: 'Identity', status: 'open' },
 ];
 
