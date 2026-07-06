@@ -42,11 +42,13 @@ export function TenantSwitcher() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/40 hover:bg-gray-800/70 border border-gray-700/50 text-sm transition-all max-w-[220px]"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-600/10 hover:bg-cyan-600/20 border border-cyan-600/40 text-sm transition-all max-w-[260px]"
+        title="Switch tenant scope"
       >
+        <span className="text-[10px] uppercase tracking-wider text-cyan-500/80 font-semibold shrink-0">Tenant</span>
         {active ? <Building2 size={14} className="text-cyan-400 shrink-0" /> : <Layers size={14} className="text-cyan-400 shrink-0" />}
-        <span className="truncate text-gray-200">{active ? active.name : 'All Tenants'}</span>
-        <ChevronDown size={13} className={clsx('text-gray-500 transition-transform shrink-0', open && 'rotate-180')} />
+        <span className="truncate text-gray-100 font-medium">{active ? active.name : 'All Tenants'}</span>
+        <ChevronDown size={13} className={clsx('text-cyan-400/70 transition-transform shrink-0', open && 'rotate-180')} />
       </button>
 
       {open && (
