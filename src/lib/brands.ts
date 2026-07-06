@@ -22,7 +22,7 @@ export const BRANDS: Record<string, Brand> = {
   sptel: { id: 'sptel', name: 'SPtel', initial: 'SP',
     ramp: { '50': '#e0faf9', '100': '#c2f2ef', '300': '#a8f0ed', '400': '#77e6e2', '500': '#4fd4cf', '600': '#2ab8b3', '700': '#1a8f8b' } },
   singtel: { id: 'singtel', name: 'Singtel', initial: 'S',
-    ramp: { '300': '#fca5a5', '400': '#f87171', '500': '#ef4444', '600': '#dc2626', '700': '#b91c1c' } },
+    ramp: { '50': '#fdeef0', '100': '#fbd5da', '300': '#f48a99', '400': '#f24d63', '500': '#ed1a3d', '600': '#c9142f', '700': '#a10f24' } },
   m1: { id: 'm1', name: 'M1', initial: 'M1',
     ramp: { '300': '#fdba74', '400': '#fb923c', '500': '#f97316', '600': '#ea580c', '700': '#c2410c' } },
 };
