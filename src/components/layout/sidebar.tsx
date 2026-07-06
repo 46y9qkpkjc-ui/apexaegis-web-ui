@@ -7,6 +7,7 @@ import { useFeatures } from '@/hooks/use-features';
 import { fetchEffectivePages, type EffectivePages } from '@/lib/rbac-api';
 import { useTenantContext } from '@/lib/tenant-context';
 import { fetchEntitlements } from '@/lib/tenants-api';
+import { useBrand, getBrand } from '@/lib/brands';
 import {
   Shield, Globe, Server, Users, Key, FileText,
   Settings, BarChart3, Network, Lock, Bug,
@@ -44,6 +45,8 @@ const navGroups: NavGroup[] = [
       { href: '/logs', icon: FileText, label: 'Logs & Events' },
       { href: '/endpoint-events', icon: Activity, label: 'Endpoint Events' },
       { href: '/network-events', icon: Wifi, label: 'Network Events' },
+      { href: '/logs/endpoint-dlp', icon: ShieldAlert, label: 'Endpoint DLP Log', premium: true },
+      { href: '/logs/transit-dlp', icon: Network, label: 'Transit DLP Log', premium: true },
     ],
   },
   {
@@ -65,6 +68,8 @@ const navGroups: NavGroup[] = [
       { href: '/profiles/dns', icon: Network, label: 'DNS Forwarding & Filter', featureId: 'dns-filter', premium: true },
       { href: '/profiles/web', icon: AlertTriangle, label: 'Web Filter', featureId: 'web-filter' },
       { href: '/profiles/device-posture-profile', icon: Smartphone, label: 'Device Posture Profile' },
+      { href: '/profiles/endpoint-dlp', icon: ShieldAlert, label: 'Endpoint DLP Profile', premium: true },
+      { href: '/profiles/transit-dlp', icon: Network, label: 'Transit DLP Profile', premium: true },
     ],
   },
   {
@@ -164,6 +169,7 @@ const hrefToSlug: Record<string, string> = {
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { isEnabled } = useFeatures();
+  const brand = getBrand(useBrand(s => s.brandId));
 
   // RBAC nav control — hide pages the current role can't view (keeps the menu
   // from growing unbounded). controlled=false → show everything (super_admin).
@@ -216,12 +222,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       'bg-gray-900/80 backdrop-blur-xl border-r border-gray-800/60 flex flex-col transition-all duration-200 h-full',
       sidebarCollapsed ? 'w-16' : 'w-60',
     )}>
-      {/* Logo */}
+      {/* Logo (skins to the active brand) */}
       <div className="h-14 px-4 flex items-center gap-3 border-b border-gray-800/60">
         <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center font-bold text-sm shadow-md shadow-cyan-600/20 flex-shrink-0">
-          A
+          {brand.initial}
         </div>
-        {!sidebarCollapsed && <span className="font-semibold text-lg tracking-tight">ApexAegis</span>}
+        {!sidebarCollapsed && <span className="font-semibold text-lg tracking-tight">{brand.name}</span>}
       </div>
 
       {/* Navigation */}

@@ -5,6 +5,7 @@ import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { TenantScopeInterceptor } from './tenant-scope-interceptor';
 import { TenantScopeBanner } from './tenant-scope-banner';
+import { BrandApplier } from './brand-applier';
 import { useTenantContext } from '@/lib/tenant-context';
 import { FeatureProvider } from '@/hooks/use-features';
 import { apiUrl } from '@/lib/api-url';
@@ -87,6 +88,7 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
 
   return (
     <FeatureProvider>
+    <BrandApplier />
     <TenantScopeInterceptor />
     <div className="flex h-screen">
       {/* Mobile sidebar overlay */}
