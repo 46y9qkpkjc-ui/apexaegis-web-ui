@@ -59,6 +59,22 @@ export interface TenantDetail {
   ghosted_apps: GhostedApp[];
 }
 
+export interface Entitlements {
+  tenant_id: string;
+  tenant_name: string;
+  tier: string; // standard | professional | enterprise
+  limits: { tier: string; display_name: string; rank: number; max_gateways: number; tenancy_type: string; max_client_users: number; monthly_price_cents: number; description: string };
+  gateways_used: number;
+  client_users_used: number;
+  entitled_features: number;
+}
+
+export async function fetchEntitlements(tenantId: string): Promise<Entitlements> {
+  const res = await fetch(`${API_BASE}/${encodeURIComponent(tenantId)}/entitlements`, { headers: authHeader() });
+  if (!res.ok) throw new Error(`Failed to load entitlements: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchGhostedApps(): Promise<GhostedApp[]> {
   const res = await fetch('/api/v1/admin/ghosted', { headers: authHeader() });
   if (!res.ok) throw new Error(`Failed to load ghosted apps: ${res.status}`);

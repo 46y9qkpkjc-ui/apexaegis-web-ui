@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
 import { useFeatures } from '@/hooks/use-features';
 import { fetchEffectivePages, type EffectivePages } from '@/lib/rbac-api';
+import { useTenantContext } from '@/lib/tenant-context';
+import { fetchEntitlements } from '@/lib/tenants-api';
 import {
   Shield, Globe, Server, Users, Key, FileText,
   Settings, BarChart3, Network, Lock, Bug,
@@ -13,6 +15,7 @@ import {
   Crosshair, Brain, Smartphone,
   ChevronRight, ChevronLeft, ShieldCheck, Award, Workflow,
   ShieldAlert, Search, ShieldOff, Building2,
+  Database, UserCog, Radar, Compass,
 } from 'lucide-react';
 
 interface NavItem {
@@ -20,6 +23,7 @@ interface NavItem {
   icon: typeof Shield;
   label: string;
   featureId?: string; // maps to feature licensing ID
+  premium?: boolean;  // gated by subscription tier — locked (Subscribe to activate) when not entitled
 }
 
 interface NavGroup {
@@ -58,7 +62,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/profiles/atp', icon: Bug, label: 'ATP Profiles', featureId: 'atp' },
       { href: '/profiles/ssl', icon: Lock, label: 'SSL Inspection', featureId: 'ssl-inspect' },
-      { href: '/profiles/dns', icon: Network, label: 'DNS Filter', featureId: 'dns-filter' },
+      { href: '/profiles/dns', icon: Network, label: 'DNS Forwarding & Filter', featureId: 'dns-filter', premium: true },
       { href: '/profiles/web', icon: AlertTriangle, label: 'Web Filter', featureId: 'web-filter' },
       { href: '/profiles/device-posture-profile', icon: Smartphone, label: 'Device Posture Profile' },
     ],
@@ -80,6 +84,8 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/audit', icon: FileText, label: 'Audit & Config Mgmt' },
       { href: '/admin/rbac', icon: ShieldCheck, label: 'RBAC / Roles' },
+      { href: '/admin/admin-users', icon: UserCog, label: 'Admin Users & Groups' },
+      { href: '/admin/identity-store', icon: Database, label: 'Identity Store' },
       { href: '/admin/features', icon: Settings, label: 'Feature Licensing' },
       { href: '/admin/client-config', icon: Users, label: 'Client Config' },
       { href: '/admin/route-config', icon: Network, label: 'Route Policies' },
@@ -88,39 +94,41 @@ const navGroups: NavGroup[] = [
   {
     label: 'Security Posture',
     items: [
-      { href: '/security', icon: GitBranch, label: 'Attack Paths & Segments' },
-      { href: '/security/attack-comparison', icon: ShieldOff, label: 'Attack Comparison' },
-      { href: '/security/ai-ueba', icon: Brain, label: 'AI/ML & UEBA', featureId: 'ueba' },
+      { href: '/security', icon: GitBranch, label: 'Attack Paths & Segments', premium: true },
+      { href: '/security/attack-comparison', icon: ShieldOff, label: 'Attack Comparison', premium: true },
+      { href: '/security/ai-ueba', icon: Brain, label: 'AI/ML & UEBA', featureId: 'ueba', premium: true },
+      { href: '/security/ctem', icon: Radar, label: 'CTEM', premium: true },
     ],
   },
   {
     label: 'Network',
     items: [
-      { href: '/sdwan', icon: Router, label: 'SD-WAN Optimizer', featureId: 'sdwan' },
+      { href: '/sdwan', icon: Router, label: 'SD-WAN Optimizer', featureId: 'sdwan', premium: true },
     ],
   },
   {
     label: 'Discovery',
     items: [
       { href: '/ghosted-apps', icon: Ghost, label: 'Ghosted Apps & Services', featureId: 'ghosted-apps' },
+      { href: '/discovery/private-apps', icon: Compass, label: 'Private App Discovery', premium: true },
     ],
   },
   {
     label: 'Security Validation',
     items: [
-      { href: '/security/test-my-defence', icon: ShieldAlert, label: 'Security CheckUp' },
-      { href: '/security/mitre-attack', icon: Crosshair, label: 'APT Simulation' },
-      { href: '/security/security-preview', icon: Search, label: 'Security Preview' },
-      { href: '/security/attack-path', icon: Crosshair, label: 'Attack Path Analysis' },
-      { href: '/security/ssl-scan', icon: Lock, label: 'SSL/TLS Scanner' },
+      { href: '/security/test-my-defence', icon: ShieldAlert, label: 'Security CheckUp', premium: true },
+      { href: '/security/mitre-attack', icon: Crosshair, label: 'APT Simulation', premium: true },
+      { href: '/security/security-preview', icon: Search, label: 'Security Preview', premium: true },
+      { href: '/security/attack-path', icon: Crosshair, label: 'Attack Path Analysis', premium: true },
+      { href: '/security/ssl-scan', icon: Lock, label: 'SSL/TLS Scanner', premium: true },
     ],
   },
   {
     label: 'Compliance',
     items: [
-      { href: '/compliance', icon: ShieldCheck, label: 'Compliance Report', featureId: 'compliance-report' },
-      { href: '/compliance/certifications', icon: Award, label: 'Certification Report' },
-      { href: '/compliance/itsm-automation', icon: Workflow, label: 'ITSM Automation' },
+      { href: '/compliance', icon: ShieldCheck, label: 'Compliance Report', featureId: 'compliance-report', premium: true },
+      { href: '/compliance/certifications', icon: Award, label: 'Certification Report', premium: true },
+      { href: '/compliance/itsm-automation', icon: Workflow, label: 'ITSM Automation', premium: true },
     ],
   },
   {
@@ -171,6 +179,17 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     return effective.pages.includes(slug);
   };
 
+  // Premium features follow the tenant's subscription tier. When scoped to a
+  // small (standard-tier) tenant, premium features are locked (Subscribe to
+  // activate). Higher tiers / the MSP all-tenants view show them unlocked.
+  const { active } = useTenantContext();
+  const [tier, setTier] = useState('');
+  useEffect(() => {
+    if (active) fetchEntitlements(active.id).then(e => setTier(e.tier)).catch(() => setTier(''));
+    else setTier('');
+  }, [active]);
+  const isLocked = (item: NavItem) => !!item.premium && !!active && tier === 'standard';
+
   // Tenants are selected via the header tenant switcher (no left-menu group).
   const renderedGroups: NavGroup[] = navGroups;
 
@@ -208,7 +227,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex-1 overflow-y-auto py-2">
         {renderedGroups.map((group) => {
           const visibleItems = group.items.filter(
-            (item) => (!item.featureId || isEnabled(item.featureId)) && rbacAllowed(item),
+            // Premium items are shown (locked) rather than hidden by a feature flag.
+            (item) => (item.premium || !item.featureId || isEnabled(item.featureId)) && rbacAllowed(item),
           );
           if (visibleItems.length === 0) return null;
           const isCollapsed = collapsed.has(group.label);
@@ -246,6 +266,26 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 {visibleItems.map((item) => {
                   const Icon = item.icon;
                   const active = pathname === item.href;
+                  // Locked premium feature: not navigable to the page; routes to
+                  // Feature Licensing to subscribe/activate.
+                  if (isLocked(item)) {
+                    return (
+                      <Link
+                        key={item.href}
+                        href="/admin/features"
+                        onClick={onNavigate}
+                        title={`Subscribe to activate ${item.label}`}
+                        className={clsx(
+                          'flex items-center gap-3 mx-2 px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:text-gray-400 hover:bg-gray-800/30 transition-all',
+                          sidebarCollapsed && 'justify-center px-0',
+                        )}
+                      >
+                        <Icon size={15} className="flex-shrink-0 opacity-60" />
+                        {!sidebarCollapsed && <span className="truncate flex-1 opacity-70">{item.label}</span>}
+                        {!sidebarCollapsed && <Lock size={12} className="text-amber-500/70 flex-shrink-0" />}
+                      </Link>
+                    );
+                  }
                   return (
                     <Link
                       key={item.href}

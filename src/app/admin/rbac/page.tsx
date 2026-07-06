@@ -9,6 +9,7 @@ import {
   fetchTenants, fetchPages, fetchRoles, createRole, updateRole, deleteRole,
   type Tenant, type RbacPage, type RbacRole,
 } from '@/lib/rbac-api';
+import { IDENTITY_STORES } from '@/lib/identity-stores';
 
 interface Grant { view: boolean; edit: boolean; }
 type GrantMap = Record<string, Grant>;
@@ -41,6 +42,8 @@ export default function RbacPage() {
   const [newName, setNewName] = useState('');
   const [newTenant, setNewTenant] = useState('global');
   const [newDesc, setNewDesc] = useState('');
+  const [newStore, setNewStore] = useState('');   // identity store id for group mapping
+  const [newGroup, setNewGroup] = useState('');    // identity-store group mapped to this role
   const [error, setError] = useState('');
 
   const loadStatic = useCallback(async () => {
@@ -119,9 +122,12 @@ export default function RbacPage() {
   async function handleCreate() {
     setError('');
     try {
-      const { id } = await createRole({ name: newName, tenant_id: newTenant, description: newDesc });
+      const desc = newStore && newGroup
+        ? `${newDesc}${newDesc ? ' · ' : ''}Mapped: ${IDENTITY_STORES.find(s => s.id === newStore)?.name}/${newGroup}`.trim()
+        : newDesc;
+      const { id } = await createRole({ name: newName, tenant_id: newTenant, description: desc });
       setCreating(false);
-      setNewName(''); setNewDesc(''); setNewTenant('global');
+      setNewName(''); setNewDesc(''); setNewTenant('global'); setNewStore(''); setNewGroup('');
       await loadRoles();
       setSelectedId(id);
     } catch (e) {
@@ -370,6 +376,33 @@ export default function RbacPage() {
                 className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-cyan-500/50 outline-none"
               />
             </div>
+            {/* Identity-store group mapping — assign this role to an IdP group */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[11px] text-gray-500">Identity Store</label>
+                <select
+                  value={newStore} onChange={e => { setNewStore(e.target.value); setNewGroup(''); }}
+                  className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:border-cyan-500/50 outline-none"
+                >
+                  <option value="">None (no group mapping)</option>
+                  {IDENTITY_STORES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] text-gray-500">Group</label>
+                <select
+                  value={newGroup} onChange={e => setNewGroup(e.target.value)}
+                  disabled={!newStore}
+                  className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:border-cyan-500/50 outline-none disabled:opacity-50"
+                >
+                  <option value="">Select group…</option>
+                  {IDENTITY_STORES.find(s => s.id === newStore)?.groups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            </div>
+            {newStore && newGroup && (
+              <p className="text-[11px] text-cyan-400/80">Members of <strong>{newGroup}</strong> in {IDENTITY_STORES.find(s => s.id === newStore)?.name} will receive this role.</p>
+            )}
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => setCreating(false)} className="text-sm px-3 py-1.5 rounded-lg text-gray-400 hover:text-gray-200">Cancel</button>
               <button
