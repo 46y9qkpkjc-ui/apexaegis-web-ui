@@ -52,7 +52,7 @@ const NAV_MAP: Record<string, string> = {
   dns: '/profiles/dns',
   'web filter': '/profiles/web',
   users: '/identity/users',
-  devices: '/identity/devices',
+  devices: '/identity/device-enrolment',
   'identity providers': '/identity/providers',
   gateways: '/gateways',
   certificates: '/certificates',

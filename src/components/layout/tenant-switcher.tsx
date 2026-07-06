@@ -16,9 +16,12 @@ export function TenantSwitcher() {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchTenantSummaries()
+    const load = () => fetchTenantSummaries()
       .then(list => setTenants(list.map(t => ({ id: t.tenant_id, name: t.tenant_name }))))
       .catch(() => { /* backend unavailable */ });
+    load();
+    const id = setInterval(load, 30000); // newly onboarded tenants appear automatically
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
+import { TenantScopeInterceptor } from './tenant-scope-interceptor';
 import { FeatureProvider } from '@/hooks/use-features';
 import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
@@ -82,6 +83,7 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
 
   return (
     <FeatureProvider>
+    <TenantScopeInterceptor />
     <div className="flex h-screen">
       {/* Mobile sidebar overlay */}
       {mobileMenuOpen && (

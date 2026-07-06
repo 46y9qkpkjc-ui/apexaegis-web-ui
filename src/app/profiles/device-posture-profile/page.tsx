@@ -2,38 +2,40 @@
 import React, { useEffect, useState } from 'react';
 import { clsx } from 'clsx';
 import { Smartphone, ToggleLeft, ToggleRight, ShieldCheck, HardDrive, RefreshCw, BadgeCheck, Save } from 'lucide-react';
+import { fetchPostureProfile, savePostureProfile, type PostureProfile } from '@/lib/posture-api';
 
-interface PostureChecks {
-  device_cert: boolean;
-  av_status: boolean;
-  disk_encryption: boolean;
-  os_latest_patch: boolean;
-}
-
-const CHECKS: { key: keyof PostureChecks; label: string; desc: string; icon: typeof ShieldCheck }[] = [
-  { key: 'device_cert', label: 'Check device certificate', desc: 'Require a valid device certificate issued by the org CA.', icon: BadgeCheck },
-  { key: 'av_status', label: 'Check AV status', desc: 'Require an active, up-to-date anti-virus / EDR agent.', icon: ShieldCheck },
-  { key: 'disk_encryption', label: 'Check disk encryption', desc: 'Require full-disk encryption (BitLocker / FileVault / LUKS).', icon: HardDrive },
-  { key: 'os_latest_patch', label: 'Check OS latest patch', desc: 'Require the OS to be on the latest security patch level.', icon: RefreshCw },
+const CHECKS: { key: keyof PostureProfile; label: string; desc: string; icon: typeof ShieldCheck }[] = [
+  { key: 'check_device_cert', label: 'Check device certificate', desc: 'Require a valid device certificate issued by the org CA.', icon: BadgeCheck },
+  { key: 'check_av', label: 'Check AV status', desc: 'Require an active, up-to-date anti-virus / EDR agent.', icon: ShieldCheck },
+  { key: 'check_disk_encryption', label: 'Check disk encryption', desc: 'Require full-disk encryption (BitLocker / FileVault / LUKS).', icon: HardDrive },
+  { key: 'check_os_patch', label: 'Check OS latest patch', desc: 'Require the OS to be on the latest security patch level.', icon: RefreshCw },
 ];
 
-const KEY = 'apexaegis_posture_profile_default';
-const DEFAULTS: PostureChecks = { device_cert: true, av_status: true, disk_encryption: true, os_latest_patch: false };
+const DEFAULTS: PostureProfile = { check_device_cert: true, check_av: true, check_disk_encryption: true, check_os_patch: false };
 
 export default function DevicePostureProfilePage() {
-  const [checks, setChecks] = useState<PostureChecks>(DEFAULTS);
+  const [checks, setChecks] = useState<PostureProfile>(DEFAULTS);
   const [dirty, setDirty] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [status, setStatus] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) setChecks({ ...DEFAULTS, ...JSON.parse(raw) });
-    } catch { /* ignore */ }
+    fetchPostureProfile().then(p => setChecks(p)).catch(() => { /* keep defaults */ });
   }, []);
 
-  const toggle = (k: keyof PostureChecks) => { setChecks(c => ({ ...c, [k]: !c[k] })); setDirty(true); setSaved(false); };
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(checks)); } catch { /* ignore */ } setDirty(false); setSaved(true); };
+  const toggle = (k: keyof PostureProfile) => { setChecks(c => ({ ...c, [k]: !c[k] })); setDirty(true); setStatus(''); };
+
+  async function save() {
+    setSaving(true); setStatus('');
+    try {
+      await savePostureProfile(checks);
+      setDirty(false); setStatus('Saved');
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -65,12 +67,12 @@ export default function DevicePostureProfilePage() {
       </div>
 
       <div className="flex items-center justify-end gap-3">
-        {saved && <span className="text-xs text-green-400">Saved</span>}
+        {status && <span className={clsx('text-xs', status === 'Saved' ? 'text-green-400' : 'text-red-400')}>{status}</span>}
         {dirty && <span className="text-xs text-amber-400">Unsaved changes</span>}
-        <button onClick={save} disabled={!dirty}
+        <button onClick={save} disabled={!dirty || saving}
           className={clsx('flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg',
-            dirty ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-gray-800 text-gray-500 cursor-not-allowed')}>
-          <Save size={15} /> Save Profile
+            dirty && !saving ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-gray-800 text-gray-500 cursor-not-allowed')}>
+          <Save size={15} /> {saving ? 'Saving…' : 'Save Profile'}
         </button>
       </div>
     </div>
