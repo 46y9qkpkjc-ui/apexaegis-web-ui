@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, Plus, Copy, Check, Trash2, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { listEnrolSecrets, generateEnrolSecret, revokeEnrolSecret, type EnrolSecret } from '@/lib/enrol-api';
+import { DeviceInventory } from '@/components/devices/device-inventory';
 
 export default function DeviceEnrolmentPage() {
   const [secrets, setSecrets] = useState<EnrolSecret[]>([]);
@@ -137,6 +138,9 @@ export default function DeviceEnrolmentPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Enrolled devices inventory + posture view modal (posture + ghosted tabs) */}
+      <DeviceInventory />
     </div>
   );
 }

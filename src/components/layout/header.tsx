@@ -7,6 +7,7 @@ import {
   Bug, Keyboard, Menu,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
+import { TenantSwitcher } from './tenant-switcher';
 
 /* Notification data */
 interface Notification {
@@ -80,6 +81,9 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void } = {}) {
       <button onClick={onMenuToggle} className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all -ml-1">
         <Menu size={20} />
       </button>
+
+      {/* Active tenant scope */}
+      <TenantSwitcher />
 
       {/* Search */}
       <div className="flex-1 max-w-md relative group">

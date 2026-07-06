@@ -5,10 +5,13 @@ import { clsx } from 'clsx';
 import {
   Building2, Shield, Users, AlertTriangle, ChevronRight, Layers,
 } from 'lucide-react';
-import { fetchTenantSummaries, type TenantSummary } from '@/lib/tenants-api';
+import { fetchTenantSummaries, fetchGhostedApps, type TenantSummary, type GhostedApp } from '@/lib/tenants-api';
+import { GhostedAppsCard } from '@/components/dashboard/ghosted-apps-card';
+import { ReportToolbar } from '@/components/dashboard/report-toolbar';
 
 export default function OverviewPage() {
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
+  const [ghosted, setGhosted] = useState<GhostedApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -16,8 +19,8 @@ export default function OverviewPage() {
     let alive = true;
     const load = async () => {
       try {
-        const data = await fetchTenantSummaries();
-        if (alive) { setTenants(data); setError(''); }
+        const [t, g] = await Promise.all([fetchTenantSummaries(), fetchGhostedApps().catch(() => [])]);
+        if (alive) { setTenants(t); setGhosted(g); setError(''); }
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : 'Failed to load');
       } finally {
@@ -28,6 +31,22 @@ export default function OverviewPage() {
     const t = setInterval(load, 30000); // auto-refresh as tenants onboard
     return () => { alive = false; clearInterval(t); };
   }, []);
+
+  function buildReport(): string {
+    const lines: string[] = [];
+    lines.push('CONSOLIDATED REPORT — ALL TENANTS');
+    lines.push('');
+    lines.push(`Tenants: ${tenants.length}`);
+    lines.push(`Total client users: ${totals.clientUsers} · policies: ${totals.policies} · DNS blocked: ${totals.blocked}`);
+    lines.push('');
+    lines.push('PER-TENANT SUMMARY');
+    tenants.forEach(t => lines.push(
+      `  ${t.tenant_name} (${t.tenant_id}) — ${t.tenant_type}/${t.plan} · users ${t.client_users} · policies ${t.policies} · devices ${t.devices} · blocked ${t.dns_blocked}`));
+    lines.push('');
+    lines.push(`GHOSTED APPS & SERVICES (${ghosted.length})`);
+    ghosted.forEach(g => lines.push(`  ${g.name} [${g.risk_level}] — ${g.device_count} devices · ${g.tenant_name}`));
+    return lines.join('\n');
+  }
 
   const totals = useMemo(() => tenants.reduce(
     (a, t) => ({
@@ -41,12 +60,17 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Layers className="text-cyan-400" size={24} />
-          Consolidated Overview
-        </h1>
-        <p className="text-sm text-gray-400 mt-1">Activity across all tenants. Select a tenant to drill into its dashboard.</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="order-2 sm:order-1">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Layers className="text-cyan-400" size={24} />
+            Consolidated Overview
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">Activity across all tenants. Select a tenant to drill into its dashboard.</p>
+        </div>
+        <div className="order-1 sm:order-2">
+          <ReportToolbar title="Consolidated Report — All Tenants" buildBody={buildReport} />
+        </div>
       </div>
 
       {error && (
@@ -122,6 +146,9 @@ export default function OverviewPage() {
           </table>
         </div>
       </div>
+
+      {/* Ghosted apps across all tenants */}
+      <GhostedAppsCard apps={ghosted} showTenant />
     </div>
   );
 }

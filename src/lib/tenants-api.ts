@@ -41,10 +41,40 @@ export interface TenantPolicyRow {
   enabled: boolean;
 }
 
+export interface GhostedApp {
+  name: string;
+  vendor: string;
+  category: string;
+  device_count: number;
+  risk_level: string;
+  duplicates_feature: string;
+  tenant_name: string;
+  tenant_id: string;
+}
+
 export interface TenantDetail {
   summary: TenantSummary;
   recent_blocks: TenantLogRow[];
   policies: TenantPolicyRow[];
+  ghosted_apps: GhostedApp[];
+}
+
+export async function fetchGhostedApps(): Promise<GhostedApp[]> {
+  const res = await fetch('/api/v1/admin/ghosted', { headers: authHeader() });
+  if (!res.ok) throw new Error(`Failed to load ghosted apps: ${res.status}`);
+  return (await res.json()).ghosted_apps ?? [];
+}
+
+export async function emailReport(input: { to: string; subject: string; body: string }): Promise<void> {
+  const res = await fetch('/api/v1/admin/report/email', {
+    method: 'POST',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({}));
+    throw new Error(msg.error ?? `Failed to email report: ${res.status}`);
+  }
 }
 
 export async function fetchTenantSummaries(): Promise<TenantSummary[]> {

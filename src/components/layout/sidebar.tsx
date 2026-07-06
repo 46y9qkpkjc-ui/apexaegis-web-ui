@@ -33,8 +33,14 @@ const navGroups: NavGroup[] = [
     label: 'Dashboard',
     items: [
       { href: '/', icon: BarChart3, label: 'Overview' },
+    ],
+  },
+  {
+    label: 'Logs & Events',
+    items: [
       { href: '/logs', icon: FileText, label: 'Logs & Events' },
       { href: '/endpoint-events', icon: Activity, label: 'Endpoint Events' },
+      { href: '/network-events', icon: Wifi, label: 'Network Events' },
     ],
   },
   {
@@ -55,14 +61,13 @@ const navGroups: NavGroup[] = [
       { href: '/profiles/ssl', icon: Lock, label: 'SSL Inspection', featureId: 'ssl-inspect' },
       { href: '/profiles/dns', icon: Network, label: 'DNS Filter', featureId: 'dns-filter' },
       { href: '/profiles/web', icon: AlertTriangle, label: 'Web Filter', featureId: 'web-filter' },
-      { href: '/profiles/device-posture', icon: Smartphone, label: 'Device Posture', featureId: 'device-posture' },
+      { href: '/profiles/device-posture-profile', icon: Smartphone, label: 'Device Posture Profile' },
     ],
   },
   {
     label: 'Identity & Access',
     items: [
       { href: '/identity/users', icon: Users, label: 'Users & Groups' },
-      { href: '/identity/devices', icon: MonitorSmartphone, label: 'Devices' },
       { href: '/identity/device-enrolment', icon: Key, label: 'Device Enrolment' },
       { href: '/identity/providers', icon: Key, label: 'Identity Providers' },
       { href: '/admin/ad-connector', icon: Server, label: 'AD Connector' },
@@ -92,7 +97,6 @@ const navGroups: NavGroup[] = [
     label: 'Network',
     items: [
       { href: '/sdwan', icon: Router, label: 'SD-WAN Optimizer', featureId: 'sdwan' },
-      { href: '/network-events', icon: Wifi, label: 'Network Events' },
     ],
   },
   {
@@ -136,7 +140,7 @@ const hrefToSlug: Record<string, string> = {
   '/': 'overview', '/logs': 'logs', '/endpoint-events': 'endpoint-events',
   '/policies': 'policies', '/objects/addresses': 'addresses', '/objects/services': 'services',
   '/objects/url-categories': 'url-categories', '/objects/cloud-apps': 'cloud-apps', '/objects/cloud-app-tenants': 'cloud-app-tenants',
-  '/profiles/atp': 'atp', '/profiles/ssl': 'ssl', '/profiles/dns': 'dns-filter', '/profiles/web': 'web-filter', '/profiles/device-posture': 'device-posture',
+  '/profiles/atp': 'atp', '/profiles/ssl': 'ssl', '/profiles/dns': 'dns-filter', '/profiles/web': 'web-filter', '/profiles/device-posture-profile': 'device-posture',
   '/identity/users': 'users', '/identity/devices': 'devices', '/identity/device-enrolment': 'device-enrolment', '/identity/providers': 'identity-providers',
   '/admin/ad-connector': 'ad-connector', '/admin/abac': 'abac', '/admin/oauth-api': 'oauth-api',
   '/audit': 'audit', '/admin/rbac': 'rbac', '/admin/features': 'features', '/admin/client-config': 'client-config', '/admin/route-config': 'route-config',

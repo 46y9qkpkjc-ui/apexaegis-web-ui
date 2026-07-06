@@ -7,6 +7,8 @@ import {
   Building2, Shield, Users, AlertTriangle, MonitorSmartphone, ArrowLeft, FileText,
 } from 'lucide-react';
 import { fetchTenantDetail, type TenantDetail } from '@/lib/tenants-api';
+import { GhostedAppsCard } from '@/components/dashboard/ghosted-apps-card';
+import { ReportToolbar } from '@/components/dashboard/report-toolbar';
 
 export default function TenantDashboardPage() {
   const params = useParams();
@@ -26,21 +28,39 @@ export default function TenantDashboardPage() {
 
   const s = detail?.summary;
 
+  function buildReport(): string {
+    if (!detail) return '';
+    const d = detail;
+    const lines: string[] = [
+      `TENANT REPORT — ${d.summary.tenant_name} (${id})`, '',
+      `Type ${d.summary.tenant_type}/${d.summary.plan} · region ${d.summary.region}`,
+      `Client users ${d.summary.client_users} · policies ${d.summary.policies} · devices ${d.summary.devices} · DNS blocked ${d.summary.dns_blocked}`,
+      '', `GHOSTED APPS & SERVICES (${d.ghosted_apps.length})`,
+    ];
+    d.ghosted_apps.forEach(g => lines.push(`  ${g.name} [${g.risk_level}] — ${g.device_count} devices`));
+    lines.push('', `RECENT DNS ACTIVITY (${d.recent_blocks.length})`);
+    d.recent_blocks.slice(0, 20).forEach(r => lines.push(`  ${r.domain} — ${r.verdict} (${r.policy_name || '—'})`));
+    return lines.join('\n');
+  }
+
   return (
     <div className="space-y-6">
       <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300">
         <ArrowLeft size={13} /> Consolidated Overview
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Building2 className="text-cyan-400" size={24} />
-          {s?.tenant_name ?? 'Tenant'}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          <span className="text-gray-400">Tenant ID:</span> <span className="font-mono">{id}</span>
-          {s && <> · <span className="capitalize">{s.tenant_type}</span> · {s.plan} · {s.region}</>}
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Building2 className="text-cyan-400" size={24} />
+            {s?.tenant_name ?? 'Tenant'}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            <span className="text-gray-400">Tenant ID:</span> <span className="font-mono">{id}</span>
+            {s && <> · <span className="capitalize">{s.tenant_type}</span> · {s.plan} · {s.region}</>}
+          </p>
+        </div>
+        {detail && <ReportToolbar title={`Tenant Report — ${detail.summary.tenant_name}`} buildBody={buildReport} />}
       </div>
 
       {error && <div className="bg-red-900/30 border border-red-800 text-red-300 text-sm px-3 py-2 rounded-lg">{error}</div>}
@@ -126,6 +146,9 @@ export default function TenantDashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Ghosted apps for this tenant */}
+          <GhostedAppsCard apps={detail!.ghosted_apps} showTenant={false} />
         </>
       )}
     </div>
