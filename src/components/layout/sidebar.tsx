@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
 import { useFeatures } from '@/hooks/use-features';
-import { fetchTenantSummaries } from '@/lib/tenants-api';
 import { fetchEffectivePages, type EffectivePages } from '@/lib/rbac-api';
 import {
   Shield, Globe, Server, Users, Key, FileText,
@@ -68,10 +67,11 @@ const navGroups: NavGroup[] = [
     label: 'Identity & Access',
     items: [
       { href: '/identity/users', icon: Users, label: 'Users & Groups' },
-      { href: '/identity/device-enrolment', icon: Key, label: 'Device Enrolment' },
+      { href: '/identity/device-enrolment', icon: MonitorSmartphone, label: 'Device Enrolment' },
       { href: '/identity/providers', icon: Key, label: 'Identity Providers' },
       { href: '/admin/ad-connector', icon: Server, label: 'AD Connector' },
-      { href: '/admin/abac', icon: Shield, label: 'ABAC Control' },
+      // ABAC Control hidden — re-enable when needed.
+      // { href: '/admin/abac', icon: Shield, label: 'ABAC Control' },
       { href: '/admin/oauth-api', icon: Key, label: 'OAuth 2.0 & API Keys' },
     ],
   },
@@ -156,22 +156,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { isEnabled } = useFeatures();
 
-  // Dynamic per-tenant submenu — refreshes so newly onboarded tenants appear.
-  const [tenantItems, setTenantItems] = useState<NavItem[]>([]);
-  useEffect(() => {
-    let alive = true;
-    const load = () => fetchTenantSummaries()
-      .then(list => {
-        if (alive) setTenantItems(list.map(t => ({
-          href: `/tenants/${t.tenant_id}`, icon: Building2, label: t.tenant_name,
-        })));
-      })
-      .catch(() => { /* backend unavailable */ });
-    load();
-    const id = setInterval(load, 30000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
-
   // RBAC nav control — hide pages the current role can't view (keeps the menu
   // from growing unbounded). controlled=false → show everything (super_admin).
   const [effective, setEffective] = useState<EffectivePages>({ controlled: false, pages: [] });
@@ -187,12 +171,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     return effective.pages.includes(slug);
   };
 
-  // Inject the Tenants group right after Dashboard.
-  const renderedGroups: NavGroup[] = [
-    navGroups[0],
-    { label: 'Tenants', items: tenantItems },
-    ...navGroups.slice(1),
-  ];
+  // Tenants are selected via the header tenant switcher (no left-menu group).
+  const renderedGroups: NavGroup[] = navGroups;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // Track collapsed groups — Dashboard always open by default
