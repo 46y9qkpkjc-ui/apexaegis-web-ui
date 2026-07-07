@@ -11,6 +11,40 @@ import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
 import type { SsoMethod } from '@/lib/auth-store';
 
+/* ─── ApexAegis brand identity (mirrors apexastute.com/products/apexaegis) ─── */
+const ACCENT = '#6D4AFF';
+
+/* Purple/indigo re-skin: override Tailwind's blue and cyan color vars so every
+   accent on this page maps to the product palette, without touching utilities. */
+const brandVars = {
+  fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
+  backgroundColor: '#0f0b25',
+  '--color-blue-300': '#b8a6ff',
+  '--color-blue-400': '#9b7fff',
+  '--color-blue-500': '#7c5cff',
+  '--color-blue-600': '#6d4aff',
+  '--color-blue-700': '#5a39e0',
+  '--color-blue-950': '#140d33',
+  '--color-cyan-300': '#b8a6ff',
+  '--color-cyan-400': '#9b7fff',
+  '--color-cyan-500': '#7c5cff',
+  '--color-cyan-600': '#6d4aff',
+} as React.CSSProperties;
+
+/** Shield-with-check mark + "Apex Aegis" wordmark, exactly as on the product site. */
+function BrandLockup({ size = 'md' }: { size?: 'md' | 'lg' }) {
+  const dim = size === 'lg' ? 30 : 26;
+  return (
+    <span className="inline-flex items-center gap-2.5" style={{ fontFamily: "'Outfit', sans-serif" }} aria-label="Apex Aegis">
+      <svg width={dim} height={dim} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+        <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" fill={ACCENT} fillOpacity="0.15" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M9 12L11 14L15 10" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="text-2xl font-bold tracking-tight text-white">Apex <span style={{ color: ACCENT }}>Aegis</span></span>
+    </span>
+  );
+}
+
 /* ─── SSO Provider type returned by /api/v1/auth/sso/providers ─── */
 interface SSOProvider {
   id: string;
@@ -416,21 +450,18 @@ export default function LoginPage() {
 
   /* ─── Render ─── */
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex" style={brandVars}>
       {/* Left - branding panel (glass effect) */}
-      <div className="hidden lg:flex lg:w-[480px] xl:w-[560px] relative overflow-hidden flex-col justify-between p-10 border-r border-gray-800/60">
+      <div className="hidden lg:flex lg:w-[480px] xl:w-[560px] relative overflow-hidden flex-col justify-between p-10 border-r border-[rgba(109,74,255,0.15)]">
         {/* Background layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/30 to-gray-900" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_20%_40%,rgba(59,130,246,0.08),transparent)]" />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0d0925] via-[#1a1440] to-[#0d0925]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_20%_40%,rgba(109,74,255,0.12),transparent)]" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[rgba(109,74,255,0.10)] rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-[rgba(155,127,255,0.08)] rounded-full blur-3xl" />
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-14">
-            <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-600/20">
-              A
-            </div>
-            <span className="text-2xl font-bold tracking-tight">ApexAegis</span>
+          <div className="mb-14">
+            <BrandLockup size="lg" />
           </div>
           <h2 className="text-3xl font-bold leading-tight mb-4">
             Security Service Edge<br />
@@ -469,13 +500,12 @@ export default function LoginPage() {
       {/* Right - login form */}
       <div className="flex-1 flex items-center justify-center p-6 relative">
         {/* Subtle bg mesh */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_50%_30%,rgba(59,130,246,0.04),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_50%_30%,rgba(109,74,255,0.06),transparent)]" />
 
         <div className="w-full max-w-md relative z-10">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-            <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-600/20">A</div>
-            <span className="text-2xl font-bold tracking-tight">ApexAegis</span>
+          <div className="lg:hidden flex mb-8 justify-center">
+            <BrandLockup />
           </div>
 
           {/* ─── Step: Detecting SSO ─── */}
