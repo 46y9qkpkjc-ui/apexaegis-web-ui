@@ -549,7 +549,7 @@ export default function OAuthApiPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setShowCreateClient(false)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">Cancel</button>
-              <button onClick={handleCreateClient} className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium transition-colors">Register Client</button>
+              <button onClick={handleCreateClient} disabled={!newClientName.trim()} className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors">Register Client</button>
             </div>
           </div>
         </>
@@ -590,7 +590,7 @@ export default function OAuthApiPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setShowCreateKey(false)} className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">Cancel</button>
-              <button onClick={handleCreateKey} className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors">Create Key</button>
+              <button onClick={handleCreateKey} disabled={!newKeyName.trim()} className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors">Create Key</button>
             </div>
           </div>
         </>
