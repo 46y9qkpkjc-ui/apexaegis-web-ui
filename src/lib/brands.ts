@@ -10,7 +10,19 @@ export interface Brand {
   ramp: Record<string, string>; // 50/100/300..700
   logoSvg?: string;             // optional provider logo (supplied asset)
   logoBg?: boolean;             // render logo inside a light rounded chip (for light-tile logos)
+  light?: boolean;              // light theme (white bg) — inverts the gray scale app-wide
+  wordmark?: boolean;           // logo already contains the name — don't render name text
 }
+
+// Inverted gray scale for light-theme brands (dark bg classes → light; light text → dark).
+const GRAY_LIGHT: Record<string, string> = {
+  '950': '#ffffff', '900': '#f7f8fa', '800': '#eceef2', '700': '#dde1e7',
+  '600': '#c3c9d2', '500': '#9aa1ab', '400': '#6b7280', '300': '#4b5563',
+  '200': '#374151', '100': '#1f2937', '50': '#111827',
+};
+
+// Optus logo (supplied wordmark; teal #00828e).
+const OPTUS_LOGO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -1 166 34"><path fill="#00828e" d="M120.3 18.6c0 4.2-2.6 6.2-6.4 6.2s-6.2-2-6.2-6.2V1.7c0-.7-.1-1.1-.9-1.4-.6-.2-1.6-.4-3-.4s-2.4.2-3 .4c-.8.3-.9.7-.9 1.4v17.1c0 8.5 5.3 13 14 13 8.8 0 14.1-4.6 14.1-13V1.7c0-.7-.1-1.1-.9-1.4-.6-.2-1.6-.4-3-.4s-2.3.2-3 .4c-.8.2-.9.6-.9 1.4v16.9zM81.8 31.7c1.4 0 2.4-.2 3-.4.8-.2.9-.6.9-1.4V7.4h8.1c.8 0 1.1-.3 1.3-.9.2-.5.3-1.4.3-2.5s-.2-2.1-.3-2.5c-.2-.6-.5-.9-1.3-.9h-24c-.8 0-1.1.3-1.3.9-.2.5-.3 1.4-.3 2.5s.2 2.1.3 2.5c.2.6.5.9 1.3.9h8.1V30c0 .7.1 1.1.9 1.4.6.1 1.7.3 3 .3M17-.1C7-.1 0 6.7 0 15.9s7 16 17 16 17-6.8 17-16-7-16-17-16m0 24.9c-5.2 0-8.9-3.7-8.9-8.9C8.1 10.6 11.8 7 17 7s8.9 3.7 8.9 8.9c-.1 5.3-3.7 8.9-8.9 8.9M53.2.5H40.3c-.6 0-1 .4-1 1V30c0 .7.1 1.1.9 1.4.6.2 1.6.4 3 .4s2.4-.2 3-.4c.8-.2.9-.6.9-1.4v-7.9h6.2c8 0 12.3-4.3 12.3-10.7C65.5 4.8 61.3.5 53.2.5M53 15.6h-5.9V7.1H53c2.8 0 4.6 1.4 4.6 4.2s-1.8 4.3-4.6 4.3m80.1 12.6c4 2.5 9.1 3.7 13.7 3.7 8 0 13.7-4 13.7-10.6 0-5-3.7-7.7-10.5-8.9l-1.4-.2c-5.2-.9-6.6-1.6-6.6-3 0-1.7 1.9-2.6 5.3-2.6 2.7 0 5.3.6 8 1.8.7.3 1.1.3 1.6-.2.8-.8 2-2.9 2.4-4.4q.3-1.05-.6-1.5c-3.3-1.6-7.3-2.5-11.4-2.5-8.3 0-13.4 3.7-13.5 9.8-.1 5.5 3.6 8.2 10.3 9.2l1.6.2c5 .8 6.5 1.4 6.5 3 0 1.8-2 3-5.5 3-3.2 0-6.4-1.1-10.2-3-.7-.4-1-.3-1.6.2-.8.8-2 3-2.4 4.4-.2.9.1 1.3.6 1.6"></path></svg>';
 
 // StarHub logo (supplied by the customer).
 const STARHUB_LOGO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.9 176.53"><path fill="#1ed760" d="M130.51,59a8.15,8.15,0,0,0-4.65-4.61,29.6,29.6,0,0,0-6.47-1.8,108.88,108.88,0,0,0-16.34-1.09c-5.92,0-15.42.46-22,.84l3-43L39,0l4.62,59.45a99.18,99.18,0,0,1,10.57-1.63S60.38,27.71,67.48,25.6c5.79-1.74,12.41,25.59,13.4,29.79l.13.52s43.48-3.69,46.12,4.2c3.13,9.37-35.6,22.77-35.6,22.77s24.72,67.94,16.34,71.87C103.14,157,86,131.92,76.55,117.47c-3.7-5.76-6.24-9.85-6.24-9.85-5.41,6.3-13,14.28-21.25,22.32l3.6,46.59L73.79,158l2.35-34.6c2.32,3.47,4.91,7.29,7.55,11a184.09,184.09,0,0,0,12.88,16.7,41.59,41.59,0,0,0,5.68,5.42,10.67,10.67,0,0,0,3,1.59,5.6,5.6,0,0,0,4.18-.12c3.16-1.47,3.65-5.17,3.78-7.24a46.34,46.34,0,0,0-.8-9.48,217.69,217.69,0,0,0-6.11-24.92C102.5,103.48,98.2,90.89,96.14,85c3.69-1.42,9.87-3.86,15.94-6.79a69.47,69.47,0,0,0,13.07-7.82c3-2.42,7-6.54,5.38-11.44"/><path fill="#1ed760" d="M2.53,75.46c-.56,8.88,38.85,9.49,43,9,0,0-50.69,72.78-45.1,81.21,3.32,5,27.94-15.54,48.63-35.74L43.65,59.45c-16.16,3.14-40.71,10.13-41.12,16"/></svg>';
@@ -37,6 +49,9 @@ export const BRANDS: Record<string, Brand> = {
     ramp: { '50': '#fdeef0', '100': '#fbd5da', '300': '#f48a99', '400': '#f24d63', '500': '#ed1a3d', '600': '#c9142f', '700': '#a10f24' } },
   m1: { id: 'm1', name: 'M1', initial: 'M1', logoSvg: M1_LOGO,
     ramp: { '50': '#fff6e8', '100': '#ffe9c6', '300': '#ffc472', '400': '#ffb04d', '500': '#ff9e1b', '600': '#e08810', '700': '#b86c08' } },
+  // Optus — LIGHT theme: white bg, teal #00828e text/links, yellow #ffcc08 buttons.
+  optus: { id: 'optus', name: 'Optus', initial: 'O', logoSvg: OPTUS_LOGO, light: true, wordmark: true,
+    ramp: { '50': '#e6f3f4', '100': '#cce7e9', '300': '#5cb3ba', '400': '#00828e', '500': '#ffcc08', '600': '#ffcc08', '700': '#e6b800' } },
 };
 
 // Demo users -> brand skin (StarHub/SPtel prioritized).
@@ -45,6 +60,7 @@ export const USER_BRAND: Record<string, string> = {
   'demouser02@apexaegis.app': 'sptel',
   'demouser03@apexaegis.app': 'singtel',
   'demouser04@apexaegis.app': 'm1',
+  'demouser05@apexaegis.app': 'optus',
 };
 
 export function getBrand(id: string): Brand {
@@ -63,6 +79,13 @@ export function applyBrand(id: string) {
     root.style.setProperty(`--color-cyan-${stop}`, hex);
     root.style.setProperty(`--color-blue-${stop}`, hex);
   });
+  if (brand.light) {
+    root.setAttribute('data-brand-light', '');
+    Object.entries(GRAY_LIGHT).forEach(([stop, hex]) => root.style.setProperty(`--color-gray-${stop}`, hex));
+  } else {
+    root.removeAttribute('data-brand-light');
+    Object.keys(GRAY_LIGHT).forEach(stop => root.style.removeProperty(`--color-gray-${stop}`));
+  }
 }
 
 interface BrandState { brandId: string; setBrand: (id: string) => void; }

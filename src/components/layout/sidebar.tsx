@@ -236,7 +236,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {brand.initial}
           </div>
         )}
-        {!sidebarCollapsed && <span className="font-semibold text-lg tracking-tight">{brand.name}</span>}
+        {!sidebarCollapsed && !brand.wordmark && <span className="font-semibold text-lg tracking-tight">{brand.name}</span>}
       </div>
 
       {/* Navigation */}

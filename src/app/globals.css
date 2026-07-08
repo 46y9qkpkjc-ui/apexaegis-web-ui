@@ -16,6 +16,17 @@
   --sidebar-width: 240px;
 }
 
+/* Light-theme brands (e.g. Optus): white background + dark text. The gray scale
+   is inverted via CSS vars in applyBrand; here we fix the literal colors utility
+   classes hardcode (text-white, black overlays) so they read on white. */
+html[data-brand-light] { color-scheme: light; }
+html[data-brand-light] body { background: #ffffff; color: #1f2937; }
+html[data-brand-light] .text-white { color: #111827 !important; }
+html[data-brand-light] .bg-black\/20,
+html[data-brand-light] .bg-black\/30,
+html[data-brand-light] .bg-black\/40,
+html[data-brand-light] .bg-black\/50 { background-color: rgba(0,0,0,0.04) !important; }
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
