@@ -224,7 +224,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     )}>
       {/* Logo (skins to the active brand) */}
       <div className="h-14 px-4 flex items-center gap-3 border-b border-gray-800/60">
-        {brand.logoSvg ? (
+        {brand.logoImg ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logoImg} alt={brand.name} className="h-8 w-auto max-w-none flex-shrink-0" />
+        ) : brand.logoSvg ? (
           <span
             className={clsx(
               'flex items-center flex-shrink-0 [&>svg]:h-8 [&>svg]:w-auto',

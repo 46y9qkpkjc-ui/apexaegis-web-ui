@@ -8,7 +8,8 @@ export interface Brand {
   name: string;
   initial: string;
   ramp: Record<string, string>; // 50/100/300..700
-  logoSvg?: string;             // optional provider logo (supplied asset)
+  logoSvg?: string;             // optional provider logo (supplied asset, inline SVG)
+  logoImg?: string;             // optional provider logo served as a raster image (public path)
   logoBg?: boolean;             // render logo inside a light rounded chip (for light-tile logos)
   light?: boolean;              // light theme (white bg) — inverts the gray scale app-wide
   wordmark?: boolean;           // logo already contains the name — don't render name text
@@ -52,6 +53,9 @@ export const BRANDS: Record<string, Brand> = {
   // Optus — LIGHT theme: white bg, teal #00828e text/links, yellow #ffcc08 buttons.
   optus: { id: 'optus', name: 'Optus', initial: 'O', logoSvg: OPTUS_LOGO, light: true, wordmark: true,
     ramp: { '50': '#e6f3f4', '100': '#cce7e9', '300': '#5cb3ba', '400': '#00828e', '500': '#ffcc08', '600': '#ffcc08', '700': '#e6b800' } },
+  // ViewQwest — LIGHT theme: white bg, charcoal text, red #c8102e accent + buttons.
+  viewqwest: { id: 'viewqwest', name: 'ViewQwest', initial: 'VQ', logoImg: '/vq-logo.png', light: true, wordmark: true,
+    ramp: { '50': '#fdeaec', '100': '#f9ccd2', '300': '#e2596b', '400': '#d0243c', '500': '#c8102e', '600': '#c8102e', '700': '#a30c25' } },
 };
 
 // Demo users -> brand skin (StarHub/SPtel prioritized).
@@ -61,6 +65,7 @@ export const USER_BRAND: Record<string, string> = {
   'demouser03@apexaegis.app': 'singtel',
   'demouser04@apexaegis.app': 'm1',
   'demouser05@apexaegis.app': 'optus',
+  'demouser06@apexaegis.app': 'viewqwest',
 };
 
 export function getBrand(id: string): Brand {
