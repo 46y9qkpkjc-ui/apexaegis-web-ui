@@ -8,6 +8,14 @@ import { TenantScopeBanner } from './tenant-scope-banner';
 import { BrandApplier } from './brand-applier';
 import { useTenantContext } from '@/lib/tenant-context';
 import { FeatureProvider } from '@/hooks/use-features';
+import { GuidedTour, type TourStep } from '@/components/guided-tour';
+
+const TOUR_STEPS: TourStep[] = [
+  { title: 'Welcome to ApexAegis', body: 'A 30-second tour of your managed SASE console — navigation, tenant scoping, and the tools you use most.' },
+  { target: '[data-tour="sidebar"]', placement: 'right', title: 'Navigate the console', body: 'Policies, logs & events, identity, security profiles, and administration — all your controls live in the sidebar.' },
+  { target: '[data-tour="tenant-switcher"]', placement: 'bottom', title: 'Switch tenants', body: 'Scope every page to a tenant here. The Overview lists all tenants, filterable by operator and dedicated/shared resource pool.' },
+  { title: "You're all set", body: 'Replay this tour anytime from the guide button on the right edge of the screen.' },
+];
 import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';
 
@@ -95,7 +103,7 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setMobileMenuOpen(false)} />
       )}
-      <div className={`fixed inset-y-0 left-0 z-50 lg:static lg:z-auto transition-transform duration-200 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <div data-tour="sidebar" className={`fixed inset-y-0 left-0 z-50 lg:static lg:z-auto transition-transform duration-200 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <Sidebar onNavigate={() => setMobileMenuOpen(false)} />
       </div>
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -107,6 +115,7 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
         </main>
       </div>
     </div>
+    <GuidedTour steps={TOUR_STEPS} storageKey="apexaegis-webui-tour-v1" label="Product tour" />
     </FeatureProvider>
   );
 }

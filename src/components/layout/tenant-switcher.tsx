@@ -37,7 +37,7 @@ export function TenantSwitcher() {
   };
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} data-tour="tenant-switcher">
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-600/10 hover:bg-cyan-600/20 border border-cyan-600/40 text-sm transition-all max-w-[260px]"
