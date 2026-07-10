@@ -100,6 +100,22 @@ export async function fetchTenantSummaries(): Promise<TenantSummary[]> {
   return (await res.json()).tenants ?? [];
 }
 
+// ─── Partner ladder: ApexAegis (platform) → operators → tenants ───
+export interface OperatorSummary {
+  operator: string;
+  tenants: number;
+  dedicated: number;
+  shared: number;
+  devices: number;
+}
+export interface OperatorLadder { platform: string; operators: OperatorSummary[]; }
+
+export async function fetchOperators(): Promise<OperatorLadder> {
+  const res = await fetch('/api/v1/admin/operators', { headers: authHeader() });
+  if (!res.ok) throw new Error(`Failed to load operators: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchTenantDetail(id: string): Promise<TenantDetail> {
   const res = await fetch(`${API_BASE}/${encodeURIComponent(id)}`, { headers: authHeader() });
   if (!res.ok) throw new Error(`Failed to load tenant: ${res.status}`);

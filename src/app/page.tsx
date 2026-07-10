@@ -19,6 +19,12 @@ export default function OverviewPage() {
   const [opFilter, setOpFilter] = useState('all');     // service provider / operator
   const [poolFilter, setPoolFilter] = useState('all'); // dedicated | shared resource pool
 
+  // Preset the operator filter when arriving from the Partner Ladder (/?operator=…).
+  useEffect(() => {
+    const op = new URLSearchParams(window.location.search).get('operator');
+    if (op) setOpFilter(op);
+  }, []);
+
   useEffect(() => {
     let alive = true;
     const load = async () => {

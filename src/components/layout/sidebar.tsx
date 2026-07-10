@@ -37,6 +37,7 @@ const navGroups: NavGroup[] = [
     label: 'Dashboard',
     items: [
       { href: '/', icon: BarChart3, label: 'Overview' },
+      { href: '/partners', icon: Network, label: 'Partners' },
     ],
   },
   {
