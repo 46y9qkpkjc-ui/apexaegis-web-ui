@@ -12,6 +12,7 @@ export interface TenantSummary {
   tenant_id: string;
   tenant_name: string;
   tenant_type: string;
+  operator: string; // service provider that manages the tenant
   plan: string;
   region: string;
   status: string;

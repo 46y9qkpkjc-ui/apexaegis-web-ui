@@ -16,6 +16,8 @@ export default function OverviewPage() {
   const [ghosted, setGhosted] = useState<GhostedApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [opFilter, setOpFilter] = useState('all');     // service provider / operator
+  const [poolFilter, setPoolFilter] = useState('all'); // dedicated | shared resource pool
 
   useEffect(() => {
     let alive = true;
@@ -34,23 +36,20 @@ export default function OverviewPage() {
     return () => { alive = false; clearInterval(t); };
   }, []);
 
-  function buildReport(): string {
-    const lines: string[] = [];
-    lines.push('CONSOLIDATED REPORT — ALL TENANTS');
-    lines.push('');
-    lines.push(`Tenants: ${tenants.length}`);
-    lines.push(`Total client users: ${totals.clientUsers} · policies: ${totals.policies} · DNS blocked: ${totals.blocked}`);
-    lines.push('');
-    lines.push('PER-TENANT SUMMARY');
-    tenants.forEach(t => lines.push(
-      `  ${t.tenant_name} (${t.tenant_id}) — ${t.tenant_type}/${t.plan} · users ${t.client_users} · policies ${t.policies} · devices ${t.devices} · blocked ${t.dns_blocked}`));
-    lines.push('');
-    lines.push(`GHOSTED APPS & SERVICES (${ghosted.length})`);
-    ghosted.forEach(g => lines.push(`  ${g.name} [${g.risk_level}] — ${g.device_count} devices · ${g.tenant_name}`));
-    return lines.join('\n');
-  }
+  // Operators present in the data drive the level-1 (service provider) filter.
+  const operators = useMemo(
+    () => Array.from(new Set(tenants.map(t => t.operator).filter(Boolean))).sort(),
+    [tenants],
+  );
+  // Level-1 (operator) + level-2 (dedicated/shared resource pool) filtering.
+  const visible = useMemo(
+    () => tenants.filter(t =>
+      (opFilter === 'all' || t.operator === opFilter) &&
+      (poolFilter === 'all' || t.tenant_type === poolFilter)),
+    [tenants, opFilter, poolFilter],
+  );
 
-  const totals = useMemo(() => tenants.reduce(
+  const totals = useMemo(() => visible.reduce(
     (a, t) => ({
       clientUsers: a.clientUsers + t.client_users,
       policies: a.policies + t.policies,
@@ -58,7 +57,25 @@ export default function OverviewPage() {
       blocked: a.blocked + t.dns_blocked,
     }),
     { clientUsers: 0, policies: 0, devices: 0, blocked: 0 },
-  ), [tenants]);
+  ), [visible]);
+
+  function buildReport(): string {
+    const lines: string[] = [];
+    lines.push('CONSOLIDATED REPORT — ALL TENANTS');
+    const scope = [opFilter !== 'all' ? `operator=${opFilter}` : '', poolFilter !== 'all' ? `pool=${poolFilter}` : ''].filter(Boolean).join(' · ');
+    if (scope) lines.push(`Filter: ${scope}`);
+    lines.push('');
+    lines.push(`Tenants: ${visible.length}`);
+    lines.push(`Total client users: ${totals.clientUsers} · policies: ${totals.policies} · DNS blocked: ${totals.blocked}`);
+    lines.push('');
+    lines.push('PER-TENANT SUMMARY');
+    visible.forEach(t => lines.push(
+      `  ${t.tenant_name} (${t.tenant_id}) — ${t.operator} · ${t.tenant_type}/${t.plan} · users ${t.client_users} · policies ${t.policies} · devices ${t.devices} · blocked ${t.dns_blocked}`));
+    lines.push('');
+    lines.push(`GHOSTED APPS & SERVICES (${ghosted.length})`);
+    ghosted.forEach(g => lines.push(`  ${g.name} [${g.risk_level}] — ${g.device_count} devices · ${g.tenant_name}`));
+    return lines.join('\n');
+  }
 
   // When a tenant is active in the switcher, the home page shows that tenant's
   // dashboard (consistent with the scope banner) instead of the consolidated view.
@@ -87,7 +104,7 @@ export default function OverviewPage() {
 
       {/* Aggregate stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Building2} label="Tenants" value={tenants.length} color="cyan" />
+        <StatCard icon={Building2} label="Tenants" value={visible.length} color="cyan" />
         <StatCard icon={Users} label="Client Users" value={totals.clientUsers} color="purple" />
         <StatCard icon={Shield} label="Policies" value={totals.policies} color="blue" />
         <StatCard icon={AlertTriangle} label="DNS Blocked" value={totals.blocked} color="red" />
@@ -95,8 +112,26 @@ export default function OverviewPage() {
 
       {/* Consolidated per-tenant table */}
       <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-800 text-sm font-semibold flex items-center gap-2">
-          <Building2 size={16} className="text-cyan-400" /> Tenants
+        <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-semibold flex items-center gap-2">
+            <Building2 size={16} className="text-cyan-400" /> Tenants
+          </span>
+          <span className="text-[11px] text-gray-500">{visible.length} of {tenants.length}</span>
+          <div className="ml-auto flex items-center gap-2">
+            {/* Level 1 — service provider / operator (the "overall apexastute" view) */}
+            <select value={opFilter} onChange={e => setOpFilter(e.target.value)} aria-label="Filter by operator"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-cyan-500/60">
+              <option value="all">All operators</option>
+              {operators.map(op => <option key={op} value={op}>{op}</option>)}
+            </select>
+            {/* Level 2 — dedicated / shared resource pool */}
+            <select value={poolFilter} onChange={e => setPoolFilter(e.target.value)} aria-label="Filter by resource pool"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-cyan-500/60">
+              <option value="all">All resource pools</option>
+              <option value="dedicated">Dedicated</option>
+              <option value="shared">Shared</option>
+            </select>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -105,6 +140,7 @@ export default function OverviewPage() {
                 <th className="text-left font-medium px-4 py-2">Tenant Name</th>
                 <th className="text-left font-medium px-4 py-2">Tenant ID</th>
                 <th className="text-left font-medium px-4 py-2">Type</th>
+                <th className="text-left font-medium px-4 py-2">Operator</th>
                 <th className="text-left font-medium px-4 py-2">Plan</th>
                 <th className="text-right font-medium px-4 py-2">Client Users</th>
                 <th className="text-right font-medium px-4 py-2">Policies</th>
@@ -115,12 +151,12 @@ export default function OverviewPage() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-500">Loading…</td></tr>
+                <tr><td colSpan={10} className="px-4 py-6 text-center text-gray-500">Loading…</td></tr>
               )}
-              {!loading && tenants.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-500">No tenants yet.</td></tr>
+              {!loading && visible.length === 0 && (
+                <tr><td colSpan={10} className="px-4 py-6 text-center text-gray-500">{tenants.length === 0 ? 'No tenants yet.' : 'No tenants match the filters.'}</td></tr>
               )}
-              {tenants.map(t => (
+              {visible.map(t => (
                 <tr key={t.tenant_id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
                   <td className="px-4 py-2.5">
                     <button onClick={() => setActive({ id: t.tenant_id, name: t.tenant_name })}
@@ -137,6 +173,7 @@ export default function OverviewPage() {
                       {t.tenant_type}
                     </span>
                   </td>
+                  <td className="px-4 py-2.5 text-gray-300">{t.operator}</td>
                   <td className="px-4 py-2.5 text-gray-400">{t.plan}</td>
                   <td className="px-4 py-2.5 text-right text-gray-300">{t.client_users}</td>
                   <td className="px-4 py-2.5 text-right text-gray-300">{t.policies}</td>
