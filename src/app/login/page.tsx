@@ -336,7 +336,7 @@ export default function LoginPage() {
           return;
         }
         signIn(
-          { email: data.user?.email, name: data.user?.name, role: data.user?.role, id: data.user?.id, org_id: data.user?.org_id },
+          { email: data.user?.email, name: data.user?.name, role: data.user?.role, id: data.user?.id, org_id: data.user?.org_id, operator_scope: data.user?.operator_scope },
           data.access_token,
           data.refresh_token,
         );
@@ -425,7 +425,7 @@ export default function LoginPage() {
       }
       // No MFA — sign in directly
       signIn(
-        { email: data.user.email, name: data.user.name, role: data.user.role, id: data.user.id, org_id: data.user.org_id },
+        { email: data.user.email, name: data.user.name, role: data.user.role, id: data.user.id, org_id: data.user.org_id, operator_scope: data.user.operator_scope },
         data.access_token,
         data.refresh_token,
       );

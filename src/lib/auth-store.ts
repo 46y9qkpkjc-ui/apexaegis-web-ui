@@ -15,7 +15,19 @@ interface AuthUser {
   role: string;
   id?: string;
   org_id?: string;
+  // Set for MSP operators (e.g. April/StarHub): the service provider whose fleet
+  // this user manages. Absent for single-tenant users (consumers/tenant admins).
+  operator_scope?: string;
   mfa_enabled?: boolean;
+}
+
+// isMspUser reports whether a user gets the multitenant/MSP console (tenant
+// switcher, consolidated overview, partner ladder). True for the platform
+// super_admin and for any operator-scoped user; false for a single-tenant
+// consumer, who is locked to their own org's data.
+export function isMspUser(user?: { role?: string; operator_scope?: string } | null): boolean {
+  if (!user) return false;
+  return user.role === 'super_admin' || !!(user.operator_scope && user.operator_scope.trim());
 }
 
 interface AuthState {

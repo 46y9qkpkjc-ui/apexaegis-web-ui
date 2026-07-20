@@ -8,6 +8,7 @@ import { fetchEffectivePages, type EffectivePages } from '@/lib/rbac-api';
 import { useTenantContext } from '@/lib/tenant-context';
 import { fetchEntitlements } from '@/lib/tenants-api';
 import { useBrand, getBrand } from '@/lib/brands';
+import { useAuthStore, isMspUser } from '@/lib/auth-store';
 import {
   Shield, Globe, Server, Users, Key, FileText,
   Settings, BarChart3, Network, Lock, Bug,
@@ -25,6 +26,7 @@ interface NavItem {
   label: string;
   featureId?: string; // maps to feature licensing ID
   premium?: boolean;  // gated by subscription tier — locked (Subscribe to activate) when not entitled
+  mspOnly?: boolean;  // multitenant/MSP surface — hidden from single-tenant consumers
 }
 
 interface NavGroup {
@@ -37,7 +39,7 @@ const navGroups: NavGroup[] = [
     label: 'Dashboard',
     items: [
       { href: '/', icon: BarChart3, label: 'Overview' },
-      { href: '/partners', icon: Network, label: 'Partners' },
+      { href: '/partners', icon: Network, label: 'Partners', mspOnly: true },
     ],
   },
   {
@@ -171,6 +173,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { isEnabled } = useFeatures();
   const brand = getBrand(useBrand(s => s.brandId));
+  const isMsp = isMspUser(useAuthStore(s => s.user));
 
   // RBAC nav control — hide pages the current role can't view (keeps the menu
   // from growing unbounded). controlled=false → show everything (super_admin).
@@ -247,6 +250,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex-1 overflow-y-auto py-2">
         {renderedGroups.map((group) => {
           const visibleItems = group.items.filter((item) => {
+            if (item.mspOnly && !isMsp) return false;
             if (!rbacAllowed(item)) return false;
             // Disabled premium features (not in the tenant's subscription) are HIDDEN
             // until activated via Feature Licensing.
@@ -327,15 +331,18 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </button>
       </div>
 
-      {/* Tenant scope — jump to the consolidated all-tenant overview */}
-      <div className="p-3 border-t border-gray-800/60">
-        <Link href="/" onClick={onNavigate} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/40 text-sm transition-all">
-          <div className="w-6 h-6 rounded bg-cyan-600/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
-            <Building2 size={13} />
-          </div>
-          {!sidebarCollapsed && <span className="flex-1 text-left truncate text-gray-300">All Tenants</span>}
-        </Link>
-      </div>
+      {/* Tenant scope — jump to the consolidated all-tenant overview. MSP-only:
+          a single-tenant consumer has no all-tenant view. */}
+      {isMsp && (
+        <div className="p-3 border-t border-gray-800/60">
+          <Link href="/" onClick={onNavigate} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/40 text-sm transition-all">
+            <div className="w-6 h-6 rounded bg-cyan-600/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
+              <Building2 size={13} />
+            </div>
+            {!sidebarCollapsed && <span className="flex-1 text-left truncate text-gray-300">All Tenants</span>}
+          </Link>
+        </div>
+      )}
     </aside>
   );
 }

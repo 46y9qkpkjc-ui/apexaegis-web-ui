@@ -9,9 +9,12 @@ import { GhostedAppsCard } from '@/components/dashboard/ghosted-apps-card';
 import { ReportToolbar } from '@/components/dashboard/report-toolbar';
 import { TenantDashboard } from '@/components/dashboard/tenant-dashboard';
 import { useTenantContext } from '@/lib/tenant-context';
+import { useAuthStore, isMspUser } from '@/lib/auth-store';
 
 export default function OverviewPage() {
   const { active, setActive } = useTenantContext();
+  const user = useAuthStore(s => s.user);
+  const isMsp = isMspUser(user);
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [ghosted, setGhosted] = useState<GhostedApp[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,14 +86,38 @@ export default function OverviewPage() {
     return lines.join('\n');
   }
 
+  // A single-tenant consumer (e.g. Samuel/Aspire) has no fleet view: land straight
+  // on their own tenant's dashboard. There is no switcher and no consolidated
+  // overview — the console only ever shows their org's data.
+  if (!isMsp && user?.org_id) {
+    return <TenantDashboard tenantId={user.org_id} />;
+  }
+
   // When a tenant is active in the switcher, the home page shows that tenant's
   // dashboard (consistent with the scope banner) instead of the consolidated view.
   if (active) {
     return <TenantDashboard tenantId={active.id} />;
   }
 
+  const firstName = user?.name?.split(' ')[0] ?? '';
+  const welcome = user?.operator_scope
+    ? `Welcome ${user.name} from ${user.operator_scope} — our most precious multitenant SASE customer.`
+    : firstName
+      ? `Welcome ${firstName} — ApexAegis platform overview across every operator.`
+      : '';
+
   return (
     <div className="space-y-6">
+      {welcome && (
+        <div className="rounded-xl border border-cyan-600/40 bg-gradient-to-r from-cyan-600/10 to-transparent px-4 py-3">
+          <p className="text-sm text-cyan-100 font-medium">{welcome}</p>
+          {user?.operator_scope && (
+            <p className="text-[11px] text-cyan-300/70 mt-0.5">
+              You are managing the {user.operator_scope} fleet — every tenant below is yours to operate.
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="order-2 sm:order-1">
           <h1 className="text-2xl font-bold flex items-center gap-2">

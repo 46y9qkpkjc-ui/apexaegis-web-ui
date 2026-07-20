@@ -51,6 +51,13 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void } = {}) {
   const displayEmail = user?.email ?? 'admin@apexaegis.io';
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
+  /* Role badge reflects the actual scope: platform super-admin, an MSP operator
+     (managing a fleet), or a single-tenant admin. */
+  const roleBadge =
+    user?.role === 'super_admin' ? 'SUPER ADMIN' :
+    user?.operator_scope ? `MSP · ${user.operator_scope}` :
+    'TENANT ADMIN';
+
   /* Close dropdowns on outside click */
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -184,7 +191,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void } = {}) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-                  <span className="px-1.5 py-0.5 rounded-md text-[9px] bg-green-900/30 text-green-400 border border-green-800/40">SUPER ADMIN</span>
+                  <span className="px-1.5 py-0.5 rounded-md text-[9px] bg-green-900/30 text-green-400 border border-green-800/40">{roleBadge}</span>
                   <span className="px-1.5 py-0.5 rounded-md text-[9px] bg-blue-900/30 text-blue-400 border border-blue-800/40">MFA ENABLED</span>
                   {ssoLabel && (
                     <span className="px-1.5 py-0.5 rounded-md text-[9px] bg-purple-900/30 text-purple-400 border border-purple-800/40">{ssoLabel}</span>

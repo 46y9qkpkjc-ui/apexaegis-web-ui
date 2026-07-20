@@ -4,24 +4,30 @@ import { clsx } from 'clsx';
 import { Building2, ChevronDown, Layers, Check } from 'lucide-react';
 import { fetchTenantSummaries } from '@/lib/tenants-api';
 import { useTenantContext, type ActiveTenant } from '@/lib/tenant-context';
+import { useAuthStore, isMspUser } from '@/lib/auth-store';
 
 // TenantSwitcher sets the active tenant that scopes the console. Selecting a
 // tenant re-scopes the CURRENT page in place (no navigation); the scope banner
-// and all pages reflect the selected tenant.
+// and all pages reflect the selected tenant. Only MSP users (the platform
+// super-admin or an operator managing a fleet) see it — a single-tenant consumer
+// is locked to their own org and has nothing to switch between.
 export function TenantSwitcher() {
+  const user = useAuthStore(s => s.user);
+  const isMsp = isMspUser(user);
   const { active, setActive } = useTenantContext();
   const [tenants, setTenants] = useState<ActiveTenant[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isMsp) return;
     const load = () => fetchTenantSummaries()
       .then(list => setTenants(list.map(t => ({ id: t.tenant_id, name: t.tenant_name }))))
       .catch(() => { /* backend unavailable */ });
     load();
     const id = setInterval(load, 30000); // newly onboarded tenants appear automatically
     return () => clearInterval(id);
-  }, []);
+  }, [isMsp]);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -35,6 +41,9 @@ export function TenantSwitcher() {
     setActive(t);
     setOpen(false);
   };
+
+  // Single-tenant consumers have no fleet to switch across.
+  if (!isMsp) return null;
 
   return (
     <div className="relative" ref={ref} data-tour="tenant-switcher">

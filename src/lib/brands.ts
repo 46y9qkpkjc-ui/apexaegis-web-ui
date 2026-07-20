@@ -56,6 +56,9 @@ export const BRANDS: Record<string, Brand> = {
   // ViewQwest — LIGHT theme: white bg, charcoal text, red #c8102e accent + buttons.
   viewqwest: { id: 'viewqwest', name: 'ViewQwest', initial: 'VQ', logoImg: '/vq-logo.png', light: true, wordmark: true,
     ramp: { '50': '#fdeaec', '100': '#f9ccd2', '300': '#e2596b', '400': '#d0243c', '500': '#c8102e', '600': '#c8102e', '700': '#a30c25' } },
+  // Aspire — StarHub consumer tenant (fintech). Generic blue wordmark, our own mark.
+  aspire: { id: 'aspire', name: 'Aspire', initial: 'A',
+    ramp: { '50': '#e8eeff', '100': '#c9d8ff', '300': '#7d9dff', '400': '#4d74ff', '500': '#1f4dff', '600': '#153fe0', '700': '#0f30b0' } },
 };
 
 // Demo users -> brand skin (StarHub/SPtel prioritized).
@@ -66,6 +69,9 @@ export const USER_BRAND: Record<string, string> = {
   'demouser04@apexaegis.app': 'm1',
   'demouser05@apexaegis.app': 'optus',
   'demouser06@apexaegis.app': 'viewqwest',
+  // Multitenant demo cast: April (StarHub MSP) + Samuel (Aspire consumer).
+  'april.woon.starhub@apexaegis.app': 'starhub',
+  'samuel.aspire@apexaegis.app': 'aspire',
 };
 
 export function getBrand(id: string): Brand {
@@ -74,6 +80,17 @@ export function getBrand(id: string): Brand {
 
 export function brandForEmail(email?: string): string {
   return (email && USER_BRAND[email.toLowerCase()]) || 'apexaegis';
+}
+
+// brandForUser skins the console for the logged-in user. An MSP operator is
+// skinned to their operator (e.g. operator_scope 'StarHub' -> starhub); everyone
+// else falls back to the per-email map. Keeps the skin correct even for users not
+// in the demo email list, as long as their operator has a brand.
+export function brandForUser(user?: { email?: string; operator_scope?: string } | null): string {
+  if (!user) return 'apexaegis';
+  const op = user.operator_scope?.trim().toLowerCase();
+  if (op && BRANDS[op]) return op;
+  return brandForEmail(user.email);
 }
 
 export function applyBrand(id: string) {
