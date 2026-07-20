@@ -207,21 +207,21 @@ function SsoPromptStep({
           : 'No Kerberos ticket or Microsoft Work Account was found on this device.'}
       </p>
 
-      {/* Available SSO methods */}
+      {/* Available SSO methods. Windows/Kerberos SSO is always offered — on a
+          domain-joined machine it signs in silently (SPNEGO); elsewhere it fails
+          gracefully back with a message. The probe only decides the header copy. */}
       <div className="space-y-2.5 max-w-sm mx-auto mb-6">
-        {kerberos && (
-          <button
-            onClick={() => onSelectSso('kerberos')}
-            className="w-full flex items-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-600/10 to-blue-600/5 hover:from-blue-600/20 hover:to-blue-600/10 border border-blue-500/30 hover:border-blue-500/50 rounded-xl text-sm transition-all group"
-          >
-            <Shield size={20} className="text-blue-400" />
-            <div className="text-left flex-1">
-              <div className="font-medium text-gray-200 group-hover:text-white">Kerberos SSO</div>
-              <div className="text-[11px] text-gray-500">SPNego / Windows Integrated Authentication</div>
-            </div>
-            <ArrowRight size={14} className="text-gray-600 group-hover:text-blue-400 transition-colors" />
-          </button>
-        )}
+        <button
+          onClick={() => onSelectSso('kerberos')}
+          className="w-full flex items-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-600/10 to-blue-600/5 hover:from-blue-600/20 hover:to-blue-600/10 border border-blue-500/30 hover:border-blue-500/50 rounded-xl text-sm transition-all group"
+        >
+          <Shield size={20} className="text-blue-400" />
+          <div className="text-left flex-1">
+            <div className="font-medium text-gray-200 group-hover:text-white">Sign in with Windows</div>
+            <div className="text-[11px] text-gray-500">Kerberos SSO · SPNEGO / Windows Integrated Authentication</div>
+          </div>
+          <ArrowRight size={14} className="text-gray-600 group-hover:text-blue-400 transition-colors" />
+        </button>
         {microsoft && (
           <button
             onClick={() => onSelectSso('microsoft')}
@@ -349,6 +349,52 @@ export default function LoginPage() {
     })();
   }, [searchParams, signIn, router, setStep]);
 
+  /* Handle the Kerberos (SPNEGO) return: ?code&method=kerberos → swap the
+     one-time code for tokens; ?sso_error → surface why silent sign-in failed. */
+  useEffect(() => {
+    const ssoError = searchParams.get('sso_error');
+    if (ssoError) {
+      const msg: Record<string, string> = {
+        kerberos_validation_failed: 'Windows sign-in could not be verified. Use your credentials instead.',
+        principal_not_provisioned: 'Your Windows account is not provisioned for this console.',
+        code_issue_failed: 'Windows sign-in failed to complete. Try again or use credentials.',
+      };
+      toast.error(msg[ssoError] ?? 'Windows sign-in failed.');
+      window.history.replaceState({}, '', '/login');
+      return;
+    }
+    const code = searchParams.get('code');
+    if (!code || searchParams.get('method') !== 'kerberos') return;
+    (async () => {
+      setLoading(true);
+      setStep('credentials'); // show a loading state
+      try {
+        const res = await fetch(apiUrl('/api/v1/auth/negotiate/exchange'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || 'Windows sign-in failed');
+          setLoading(false);
+          window.history.replaceState({}, '', '/login');
+          return;
+        }
+        signIn(
+          { email: data.user.email, name: data.user.name, role: data.user.role, id: data.user.id, org_id: data.user.org_id, operator_scope: data.user.operator_scope },
+          data.access_token,
+          data.refresh_token,
+        );
+        toast.success(`Signed in as ${data.user.email}`);
+        router.replace('/');
+      } catch {
+        toast.error('Windows sign-in failed — network error');
+        setLoading(false);
+      }
+    })();
+  }, [searchParams, signIn, router, setStep]);
+
   /* Initiate SSO redirect for a configured OIDC provider */
   const handleSsoProviderClick = useCallback(async (idpId: string) => {
     setLoading(true);
@@ -387,12 +433,17 @@ export default function LoginPage() {
     [setSsoProbe, setStep],
   );
 
-  /* Local SSO probes only hand off to configured IdP providers. */
+  /* SSO method selection. Kerberos does a full-page navigation to the MP's
+     Negotiate endpoint so the browser can complete Windows Integrated Auth
+     silently (SPNEGO), then it redirects back here with ?code&method=kerberos. */
   const handleSsoSignIn = (method: SsoMethod) => {
     setSsoMethod(method);
-    const label =
-      method === 'kerberos' ? 'Kerberos SSO' :
-      method === 'microsoft' ? 'Microsoft Entra ID' : 'SAML';
+    if (method === 'kerberos') {
+      const redirect = `${window.location.origin}/login`;
+      window.location.href = `${apiUrl('/api/v1/auth/negotiate')}?redirect_uri=${encodeURIComponent(redirect)}`;
+      return;
+    }
+    const label = method === 'microsoft' ? 'Microsoft Entra ID' : 'SAML';
     toast.info(`${label} is not configured for this tenant yet. Use the configured Okta provider or local administrator credentials.`);
     setStep('sso-prompt');
   };
