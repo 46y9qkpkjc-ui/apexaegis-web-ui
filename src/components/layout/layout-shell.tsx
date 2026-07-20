@@ -42,7 +42,9 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
     if (!accessToken) {
       signOut();
       router.replace('/login');
-      setCheckingAuth(false);
+      // Keep checkingAuth=true so the "Verifying session…" state holds until the
+      // redirect lands — flipping it to false here paints the protected shell for
+      // one frame first (the unauthenticated flash).
       return;
     }
 
@@ -58,12 +60,17 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
           headers: { Authorization: `Bearer ${accessToken}` },
           cache: 'no-store',
         });
-        if (!res.ok) rejectSession();
+        if (!res.ok) {
+          // Session rejected → redirect. Do NOT clear checkingAuth: keep the
+          // spinner up through the navigation so no protected content flashes.
+          rejectSession();
+          return;
+        }
       } catch {
-        // A temporary network outage should not destroy a valid local session.
-      } finally {
-        if (!cancelled && showLoading) setCheckingAuth(false);
+        // A temporary network outage should not destroy a valid local session —
+        // fall through and reveal the content below.
       }
+      if (!cancelled && showLoading) setCheckingAuth(false);
     };
 
     void validateSession(true);
