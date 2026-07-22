@@ -69,9 +69,10 @@ export const USER_BRAND: Record<string, string> = {
   'demouser04@apexaegis.app': 'm1',
   'demouser05@apexaegis.app': 'optus',
   'demouser06@apexaegis.app': 'viewqwest',
-  // Multitenant demo cast: April (StarHub MSP) + Evelyn (Aspire consumer).
+  // Multitenant demo cast: April (StarHub MSP) + Evelyn (Aspire consumer) + Francis (Singtel MSP).
   'april.woon.starhub@apexaegis.app': 'starhub',
   'evelyn.ng.aspire@apexaegis.app': 'aspire',
+  'francis.tan.singtel@apexaegis.app': 'singtel',
 };
 
 export function getBrand(id: string): Brand {
