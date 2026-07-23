@@ -21,6 +21,18 @@ export interface RiskDecision {
   actioned_as: string;   // '' | 'policy' | 'ticket'
   actioned_ref: string;
   created_at: string;
+  // Rich verdict fields for the risk-score card (from the live verdict cache;
+  // may be empty once a verdict expires). signals is the raw emit_verdict object.
+  confidence?: string;   // low | medium | high
+  top_factors?: string[];
+  signals?: {
+    domain_age?: string;
+    reputation?: string;
+    dga_like?: boolean;
+    geo_risk?: string;
+    newly_observed?: boolean;
+  };
+  tools_ran?: string[];
 }
 
 function authHeaders(): Record<string, string> {

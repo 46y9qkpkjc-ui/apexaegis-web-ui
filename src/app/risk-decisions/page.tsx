@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Fragment } from 'react';
 import { clsx } from 'clsx';
-import { Brain, ShieldPlus, TicketPlus, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Brain, ShieldPlus, TicketPlus, CheckCircle2, RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { listDecisions, promotePolicy, createTicketFromDecision, type RiskDecision } from '@/lib/risk-decisions-api';
+import { RiskScoreCard } from '@/components/risk/risk-score-card';
 
 const decisionChip: Record<string, string> = {
   allow: 'text-green-400 border-green-800 bg-green-900/20',
@@ -16,6 +17,7 @@ export default function RiskDecisionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string>('');
+  const [expanded, setExpanded] = useState<string>('');
 
   const load = useCallback(async () => {
     try {
@@ -100,8 +102,16 @@ export default function RiskDecisionsPage() {
                 <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-500">No risk decisions yet — they appear as the SWG adjudicates new domains.</td></tr>
               )}
               {rows.map(d => (
-                <tr key={d.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 align-top">
-                  <td className="px-4 py-2.5 font-mono text-[12px] text-gray-200">{d.domain}</td>
+                <Fragment key={d.id}>
+                <tr
+                  onClick={() => setExpanded(expanded === d.id ? '' : d.id)}
+                  className="border-b border-gray-800/50 hover:bg-gray-800/30 align-top cursor-pointer">
+                  <td className="px-4 py-2.5 font-mono text-[12px] text-gray-200">
+                    <span className="inline-flex items-center gap-1.5">
+                      {expanded === d.id ? <ChevronDown size={13} className="text-gray-500" /> : <ChevronRight size={13} className="text-gray-500" />}
+                      {d.domain}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5 text-gray-300">{d.tenant_name}</td>
                   <td className="px-4 py-2.5 text-gray-400 text-[12px]">{d.actor_user || '—'}</td>
                   <td className="px-4 py-2.5">
@@ -118,12 +128,12 @@ export default function RiskDecisionsPage() {
                     ) : (
                       <div className="inline-flex gap-1.5">
                         {d.decision === 'allow' && (
-                          <button disabled={busy === d.id} onClick={() => onPromote(d)}
+                          <button disabled={busy === d.id} onClick={(e) => { e.stopPropagation(); onPromote(d); }}
                             className="inline-flex items-center gap-1 px-2 py-1 bg-green-900/30 hover:bg-green-900/50 border border-green-800/50 rounded text-[11px] text-green-300 disabled:opacity-50">
                             <ShieldPlus size={12} /> Policy
                           </button>
                         )}
-                        <button disabled={busy === d.id} onClick={() => onTicket(d)}
+                        <button disabled={busy === d.id} onClick={(e) => { e.stopPropagation(); onTicket(d); }}
                           className="inline-flex items-center gap-1 px-2 py-1 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800/50 rounded text-[11px] text-blue-300 disabled:opacity-50">
                           <TicketPlus size={12} /> Ticket
                         </button>
@@ -131,6 +141,14 @@ export default function RiskDecisionsPage() {
                     )}
                   </td>
                 </tr>
+                {expanded === d.id && (
+                  <tr className="border-b border-gray-800/50 bg-gray-900/20">
+                    <td colSpan={8} className="px-4 py-3">
+                      <RiskScoreCard d={d} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>
