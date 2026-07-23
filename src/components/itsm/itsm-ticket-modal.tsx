@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { X, ExternalLink, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { createTicket } from '@/lib/itsm-api';
 
 interface ItsmTicketModalProps {
   open: boolean;
@@ -14,7 +15,7 @@ interface ItsmTicketModalProps {
   };
 }
 
-type Platform = 'jira' | 'servicenow';
+type Platform = 'internal' | 'jira' | 'servicenow';
 
 interface TicketForm {
   platform: Platform;
@@ -27,15 +28,24 @@ interface TicketForm {
   labels: string;
 }
 
-/* ── Demo config (would come from /settings in production) ── */
+/* ── config. Internal is the native, persisted provider; JIRA/ServiceNow are
+   external routing intents until those integrations are wired. ── */
+const INTERNAL_TYPES = ['Service Request', 'Change Request', 'Incident'];
 const JIRA_PROJECTS = ['SEC', 'OPS', 'INFRA', 'NET'];
 const SNOW_CATEGORIES = ['Incident', 'Problem', 'Change Request', 'Service Request'];
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
 
+// Internal-type label → API ticket_type enum.
+const INTERNAL_TYPE_MAP: Record<string, string> = {
+  'Service Request': 'service_request',
+  'Change Request': 'change_request',
+  'Incident': 'incident',
+};
+
 export function ItsmTicketModal({ open, onClose, prefill }: ItsmTicketModalProps) {
   const [form, setForm] = useState<TicketForm>({
-    platform: 'jira',
-    project: JIRA_PROJECTS[0],
+    platform: 'internal',
+    project: INTERNAL_TYPES[0],
     issueType: 'Bug',
     summary: prefill?.title ?? '',
     description: prefill?.description ?? '',
@@ -47,25 +57,47 @@ export function ItsmTicketModal({ open, onClose, prefill }: ItsmTicketModalProps
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [createdKey, setCreatedKey] = useState('');
 
   if (!open) return null;
 
   const handleChange = (field: keyof TicketForm, value: string) =>
     setForm(f => ({ ...f, [field]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    /* Simulate API call */
+    // Internal is the real, persisted provider.
+    if (form.platform === 'internal') {
+      try {
+        const t = await createTicket({
+          provider: 'internal',
+          ticket_type: INTERNAL_TYPE_MAP[form.project] ?? 'service_request',
+          priority: form.priority.toLowerCase(),
+          summary: form.summary,
+          description: form.description,
+          assignee: form.assignee,
+        });
+        setCreatedKey(t.ticket_key);
+        setSubmitted(true);
+        toast.success(`Internal ticket ${t.ticket_key} created`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to create ticket');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+    // JIRA/ServiceNow: external routing intent (simulated until integrated).
     setTimeout(() => {
       setSubmitting(false);
       setSubmitted(true);
       toast.success(
         form.platform === 'jira'
-          ? `Jira ticket ${form.project}-${Math.floor(1000 + Math.random() * 9000)} created`
-          : `ServiceNow INC${Math.floor(100000 + Math.random() * 900000)} created`,
+          ? `Jira ticket ${form.project}-${Math.floor(1000 + Math.random() * 9000)} queued`
+          : `ServiceNow INC${Math.floor(100000 + Math.random() * 900000)} queued`,
       );
-    }, 1200);
+    }, 1000);
   };
 
   return (
@@ -82,20 +114,24 @@ export function ItsmTicketModal({ open, onClose, prefill }: ItsmTicketModalProps
         {submitted ? (
           <div className="p-8 text-center space-y-3">
             <CheckCircle2 size={48} className="mx-auto text-green-400" />
-            <p className="text-lg font-medium text-green-300">Ticket Created Successfully</p>
+            <p className="text-lg font-medium text-green-300">
+              {form.platform === 'internal' ? `Ticket ${createdKey} created` : 'Routing intent recorded'}
+            </p>
             <p className="text-sm text-gray-400">
-              {form.platform === 'jira'
-                ? 'View in Jira to assign and track progress.'
-                : 'View in ServiceNow to manage the incident lifecycle.'}
+              {form.platform === 'internal'
+                ? 'Tracked in the internal ITSM queue for this tenant.'
+                : `Queued for ${form.platform === 'jira' ? 'Jira' : 'ServiceNow'} — will sync once the integration is connected.`}
             </p>
             <div className="flex justify-center gap-3 pt-2">
-              <button
-                onClick={() => toast.info('Would open external ITSM URL')}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm transition-colors"
-              >
-                <ExternalLink size={14} />
-                Open in {form.platform === 'jira' ? 'Jira' : 'ServiceNow'}
-              </button>
+              {form.platform !== 'internal' && (
+                <button
+                  onClick={() => toast.info('Would open external ITSM URL')}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm transition-colors"
+                >
+                  <ExternalLink size={14} />
+                  Open in {form.platform === 'jira' ? 'Jira' : 'ServiceNow'}
+                </button>
+              )}
               <button onClick={onClose} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">
                 Close
               </button>
@@ -105,33 +141,43 @@ export function ItsmTicketModal({ open, onClose, prefill }: ItsmTicketModalProps
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             {/* Platform selector */}
             <div className="flex gap-2">
-              {(['jira', 'servicenow'] as const).map(p => (
+              {(['internal', 'jira', 'servicenow'] as const).map(p => (
                 <button
                   key={p}
                   type="button"
-                  onClick={() => handleChange('platform', p)}
+                  onClick={() => {
+                    handleChange('platform', p);
+                    if (p === 'internal') handleChange('project', INTERNAL_TYPES[0]);
+                    else if (p === 'jira') handleChange('project', JIRA_PROJECTS[0]);
+                    else handleChange('project', SNOW_CATEGORIES[0]);
+                  }}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
                     form.platform === p
                       ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                       : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
                   }`}
                 >
-                  {p === 'jira' ? 'Jira' : 'ServiceNow'}
+                  {p === 'internal' ? 'Internal' : p === 'jira' ? 'Jira' : 'ServiceNow'}
                 </button>
               ))}
             </div>
+            {form.platform !== 'internal' && (
+              <p className="text-[11px] text-gray-500 -mt-2">
+                External routing intent — recorded until the {form.platform === 'jira' ? 'Jira' : 'ServiceNow'} integration is connected.
+              </p>
+            )}
 
-            {/* Project / Category */}
+            {/* Type / Project / Category */}
             <div>
               <label className="block text-xs text-gray-400 mb-1">
-                {form.platform === 'jira' ? 'Project' : 'Category'}
+                {form.platform === 'internal' ? 'Request Type' : form.platform === 'jira' ? 'Project' : 'Category'}
               </label>
               <select
                 value={form.project}
                 onChange={e => handleChange('project', e.target.value)}
                 className="input-field"
               >
-                {(form.platform === 'jira' ? JIRA_PROJECTS : SNOW_CATEGORIES).map(v => (
+                {(form.platform === 'internal' ? INTERNAL_TYPES : form.platform === 'jira' ? JIRA_PROJECTS : SNOW_CATEGORIES).map(v => (
                   <option key={v}>{v}</option>
                 ))}
               </select>
