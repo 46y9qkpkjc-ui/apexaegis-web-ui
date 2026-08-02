@@ -45,7 +45,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Logs & Events',
     items: [
-      { href: '/logs', icon: FileText, label: 'Logs & Events' },
+      { href: '/logs', icon: FileText, label: 'Security Events' },
       { href: '/risk-decisions', icon: Brain, label: 'Risk Decisions' },
       { href: '/endpoint-events', icon: Activity, label: 'Endpoint Events' },
       { href: '/network-events', icon: Wifi, label: 'Network Events' },

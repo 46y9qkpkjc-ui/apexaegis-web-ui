@@ -21,13 +21,22 @@ export function TenantSwitcher() {
 
   useEffect(() => {
     if (!isMsp) return;
+    // Scope the selector to the caller's fleet: an operator (operator_scope set)
+    // only sees the tenants their operator manages — never another operator's
+    // clients or the base ApexAegis org. The platform super_admin sees every
+    // tenant. Defense-in-depth on top of the MP's own operator scoping.
+    const scope = user?.operator_scope?.trim().toLowerCase();
+    const inScope = (operator: string) =>
+      user?.role === 'super_admin' || !scope || (operator ?? '').trim().toLowerCase() === scope;
     const load = () => fetchTenantSummaries()
-      .then(list => setTenants(list.map(t => ({ id: t.tenant_id, name: t.tenant_name }))))
+      .then(list => setTenants(
+        list.filter(t => inScope(t.operator)).map(t => ({ id: t.tenant_id, name: t.tenant_name })),
+      ))
       .catch(() => { /* backend unavailable */ });
     load();
     const id = setInterval(load, 30000); // newly onboarded tenants appear automatically
     return () => clearInterval(id);
-  }, [isMsp]);
+  }, [isMsp, user?.operator_scope, user?.role]);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {

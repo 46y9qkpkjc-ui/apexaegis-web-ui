@@ -35,14 +35,51 @@ export interface RiskDecision {
   tools_ran?: string[];
 }
 
+// Consolidated per-domain risk activity (the main console list). Aggregates every
+// hit for a (tenant, domain); decision/score/verdict reflect the latest hit.
+export interface RiskDomain {
+  tenant_id: string;
+  tenant_name: string;
+  operator: string;
+  domain: string;
+  decision: 'allow' | 'monitor' | 'deny';
+  risk_score: number;
+  source: string;
+  category: string;
+  hit_count: number;
+  distinct_users: number;
+  first_seen: string;
+  last_seen: string;
+  confidence?: string;
+  top_factors?: string[];
+  signals?: {
+    domain_age?: string;
+    reputation?: string;
+    dga_like?: boolean;
+    geo_risk?: string;
+    newly_observed?: boolean;
+  };
+  tools_ran?: string[];
+}
+
 function authHeaders(): Record<string, string> {
   const token = useAuthStore.getState().accessToken;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function listDecisions(): Promise<RiskDecision[]> {
+// Consolidated per-domain risk log (one row per domain) — tenant-scoped by the
+// global X-Scope-Tenant-ID interceptor.
+export async function listDomains(): Promise<RiskDomain[]> {
   const res = await fetch(apiUrl('/api/v1/admin/risk/decisions'), { headers: { ...authHeaders() } });
   if (!res.ok) throw new Error('failed to load risk decisions');
+  const data = await res.json();
+  return data.domains ?? [];
+}
+
+// Per-hit decisions for ONE domain — the expand/detail under a consolidated row.
+export async function listDomainDecisions(domain: string): Promise<RiskDecision[]> {
+  const res = await fetch(apiUrl(`/api/v1/admin/risk/decisions?domain=${encodeURIComponent(domain)}`), { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error('failed to load domain decisions');
   const data = await res.json();
   return data.decisions ?? [];
 }

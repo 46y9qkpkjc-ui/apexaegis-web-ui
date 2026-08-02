@@ -1,9 +1,11 @@
 'use client';
-// Self-contained guided product tour: an edge-docked launcher chip + a stepped,
-// spotlighted tooltip card (Skip / Back / Next, "Step X of N"). Brand-aware via
-// the --color-cyan-* CSS vars the skin overrides, so the accent matches the
-// active partner. No external dependency. Reused verbatim in the storefront.
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+// Self-contained guided product tour: a stepped, spotlighted tooltip card
+// (Skip / Back / Next, "Step X of N"). Brand-aware via the --color-cyan-* CSS
+// vars the skin overrides, so the accent matches the active partner. No external
+// dependency. The launcher now lives in the top menu (header) and starts the tour
+// through the shared ui-panels store — this component only renders the overlay.
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useUiPanels } from '@/lib/ui-panels';
 
 export interface TourStep {
   target?: string;                       // CSS selector; omit for a centered card
@@ -15,13 +17,13 @@ export interface TourStep {
 interface Props {
   steps: TourStep[];
   storageKey: string;   // localStorage key so a completed tour doesn't auto-open
-  label?: string;       // launcher chip label
+  label?: string;       // retained for call-site compatibility; launcher is in the header
   autoStart?: boolean;  // open on first visit
 }
 
 const ACCENT = 'var(--color-cyan-500, #06b6d4)';
 
-export function GuidedTour({ steps, storageKey, label = 'Guide', autoStart = true }: Props) {
+export function GuidedTour({ steps, storageKey, autoStart = true }: Props) {
   const [active, setActive] = useState(false);
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -35,6 +37,19 @@ export function GuidedTour({ steps, storageKey, label = 'Guide', autoStart = tru
       return () => clearTimeout(t);
     }
   }, [autoStart, storageKey]);
+
+  // Header launcher → shared store → (re)start the tour from step 0. The ref
+  // guards against firing on mount/remount: only an actual increment (a real
+  // click) starts the tour, not the initial value being read back.
+  const tourStartCount = useUiPanels((s) => s.tourStartCount);
+  const prevStartCount = useRef(tourStartCount);
+  useEffect(() => {
+    if (tourStartCount !== prevStartCount.current) {
+      prevStartCount.current = tourStartCount;
+      setIdx(0);
+      setActive(true);
+    }
+  }, [tourStartCount]);
 
   const locate = useCallback(() => {
     if (!step?.target) { setRect(null); return; }
@@ -58,32 +73,14 @@ export function GuidedTour({ steps, storageKey, label = 'Guide', autoStart = tru
     setActive(false); setIdx(0); setRect(null);
   }, [storageKey]);
 
-  const start = () => { setIdx(0); setActive(true); };
   const next = () => (idx < steps.length - 1 ? setIdx(idx + 1) : finish());
   const back = () => setIdx(Math.max(0, idx - 1));
 
   if (!steps.length) return null;
 
-  // ── Launcher chip (edge-docked, like the reference) ──
-  if (!active) {
-    return (
-      <button
-        onClick={start}
-        aria-label="Open product tour"
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-[60] flex items-center gap-2 pl-3 pr-2 py-2.5 rounded-l-xl text-white text-xs font-semibold shadow-2xl hover:pr-3 transition-all"
-        style={{ backgroundColor: ACCENT }}
-      >
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-        </span>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" />
-        </svg>
-        {label}
-      </button>
-    );
-  }
+  // The launcher now lives in the header (top menu); when the tour is inactive
+  // there is nothing to overlay, so render nothing.
+  if (!active) return null;
 
   // ── Positioning of the tooltip card ──
   const CARD_W = 320, GAP = 12, PAD = 12;

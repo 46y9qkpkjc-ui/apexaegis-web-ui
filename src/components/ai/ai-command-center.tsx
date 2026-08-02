@@ -9,6 +9,7 @@ import {
 import { clsx } from 'clsx';
 import { useVoiceControl } from '@/hooks/use-voice-control';
 import { processCommand, type AiConversationMessage, type AiAction, type UrlLookupResult } from '@/lib/ai-engine';
+import { useUiPanels } from '@/lib/ui-panels';
 import { toast } from 'sonner';
 import { UrlLookupResultCard } from '@/components/ai/url-lookup-result';
 
@@ -42,7 +43,11 @@ const SUGGESTIONS = [
 ];
 
 export function AiCommandCenter() {
-  const [open, setOpen] = useState(false);
+  // Open state is driven by the shared ui-panels store so the header (a separate
+  // React subtree) can toggle this panel. The floating launcher has moved there.
+  const open = useUiPanels((s) => s.aiOpen);
+  const setAiOpen = useUiPanels((s) => s.setAiOpen);
+  const toggleAi = useUiPanels((s) => s.toggleAi);
   const [messages, setMessages] = useState<AiConversationMessage[]>([
     {
       id: 'welcome',
@@ -165,30 +170,18 @@ export function AiCommandCenter() {
     function onKey(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        setOpen(o => !o);
+        toggleAi();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [toggleAi]);
 
   return (
     <>
-      {/* ── Floating trigger button ──────────────────────── */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className={clsx(
-          'fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-full shadow-lg transition-all',
-          'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white',
-          open && 'scale-0 pointer-events-none',
-        )}
-      >
-        <Bot size={20} />
-        <span className="text-sm font-medium">AI Assistant</span>
-        <kbd className="hidden sm:inline-flex ml-1 px-1.5 py-0.5 text-[10px] bg-white/20 rounded">Ctrl K</kbd>
-      </button>
-
       {/* ── Panel ────────────────────────────────────────── */}
+      {/* The launcher now lives in the header (top menu); this component only
+          renders the panel, opened via the shared ui-panels store. */}
       {open && (
         <div className="fixed bottom-6 right-6 z-50 w-[420px] max-h-[600px] flex flex-col bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden animate-slidein">
           {/* Header */}
@@ -198,7 +191,7 @@ export function AiCommandCenter() {
               <span className="font-semibold text-sm">ApexAegis AI</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">Claude</span>
             </div>
-            <button onClick={() => setOpen(false)} className="p-1 hover:bg-gray-800 rounded transition-colors">
+            <button onClick={() => setAiOpen(false)} className="p-1 hover:bg-gray-800 rounded transition-colors">
               <X size={16} className="text-gray-400" />
             </button>
           </div>

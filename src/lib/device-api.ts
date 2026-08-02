@@ -15,6 +15,7 @@ export interface DeviceRow {
   last_seen: string;
   tenant_name: string;
   tenant_id: string;
+  user: string;
 }
 
 export async function fetchDevices(tenantId?: string): Promise<DeviceRow[]> {

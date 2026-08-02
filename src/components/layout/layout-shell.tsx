@@ -14,7 +14,7 @@ const TOUR_STEPS: TourStep[] = [
   { title: 'Welcome to ApexAegis', body: 'A 30-second tour of your managed SASE console — navigation, tenant scoping, and the tools you use most.' },
   { target: '[data-tour="sidebar"]', placement: 'right', title: 'Navigate the console', body: 'Policies, logs & events, identity, security profiles, and administration — all your controls live in the sidebar.' },
   { target: '[data-tour="tenant-switcher"]', placement: 'bottom', title: 'Switch tenants', body: 'Scope every page to a tenant here. The Overview lists all tenants, filterable by operator and dedicated/shared resource pool.' },
-  { title: "You're all set", body: 'Replay this tour anytime from the guide button on the right edge of the screen.' },
+  { title: "You're all set", body: 'Replay this tour anytime from the compass button in the top menu.' },
 ];
 import { apiUrl } from '@/lib/api-url';
 import { useAuthStore } from '@/lib/auth-store';

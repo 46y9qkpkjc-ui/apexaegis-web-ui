@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   FileText, Search, Filter, Download, RefreshCw, ChevronDown, ChevronRight,
   Sparkles, TicketIcon, Loader2, X, Mic, MicOff, Bot,
@@ -13,36 +13,12 @@ import { useVoiceControl } from '@/hooks/use-voice-control';
 import { TrafficInspectionFlow, simulateInspectionFlow, type TrafficFlowData } from '@/components/logs/traffic-inspection-flow';
 import { PageEventsTracker } from '@/components/logs/page-events-tracker';
 import { TrafficTimingWaterfall } from '@/components/logs/traffic-timing-waterfall';
+import { listSecurityEvents, type LogEntry } from '@/lib/security-events-api';
 
 /* ─── Types ─────────────────────────────────────────────────── */
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  user: string;
-  sourceIp: string;
-  action: 'allow' | 'deny' | 'monitor' | 'dns-block';
-  destination: string;
-  category: string;
-  policyName: string;
-  bytesIn: number;
-  bytesOut: number;
-  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
-  gatewayRegion: string;
-}
-
-/* ─── Demo data ─────────────────────────────────────────────── */
-const demoLogs: LogEntry[] = [
-  { id: '1', timestamp: '2026-03-10 14:32:05', user: 'jdoe@acme.com', sourceIp: '10.0.1.42', action: 'deny', destination: 'malware-c2.evil.com', category: 'Malware', policyName: 'Block Malware & Phishing', bytesIn: 0, bytesOut: 342, severity: 'critical', gatewayRegion: 'us-east-1' },
-  { id: '2', timestamp: '2026-03-10 14:31:58', user: 'alice@acme.com', sourceIp: '10.0.2.18', action: 'deny', destination: 'phishing-login.net', category: 'Phishing', policyName: 'Block Malware & Phishing', bytesIn: 0, bytesOut: 518, severity: 'high', gatewayRegion: 'us-east-1' },
-  { id: '3', timestamp: '2026-03-10 14:31:45', user: 'bob@acme.com', sourceIp: '10.0.1.87', action: 'allow', destination: 'slack.com', category: 'SaaS', policyName: 'Allow Sanctioned SaaS', bytesIn: 24300, bytesOut: 1820, severity: 'info', gatewayRegion: 'us-west-2' },
-  { id: '4', timestamp: '2026-03-10 14:31:32', user: 'charlie@acme.com', sourceIp: '10.0.3.11', action: 'deny', destination: 'crypto-miner.cc', category: 'Cryptomining', policyName: 'Block Malware & Phishing', bytesIn: 0, bytesOut: 290, severity: 'high', gatewayRegion: 'eu-west-1' },
-  { id: '5', timestamp: '2026-03-10 14:31:20', user: 'jdoe@acme.com', sourceIp: '10.0.1.42', action: 'dns-block', destination: 'new-domain-3day.xyz', category: 'NRD', policyName: 'Block NRD & NOD', bytesIn: 0, bytesOut: 64, severity: 'medium', gatewayRegion: 'us-east-1' },
-  { id: '6', timestamp: '2026-03-10 14:31:05', user: 'eve@acme.com', sourceIp: '10.0.2.55', action: 'allow', destination: 'github.com', category: 'SaaS', policyName: 'Allow Sanctioned SaaS', bytesIn: 185200, bytesOut: 4200, severity: 'info', gatewayRegion: 'us-east-1' },
-  { id: '7', timestamp: '2026-03-10 14:30:50', user: 'dave@acme.com', sourceIp: '10.0.4.23', action: 'allow', destination: 'outlook.office365.com', category: 'SaaS', policyName: 'Allow Sanctioned SaaS', bytesIn: 52100, bytesOut: 3100, severity: 'info', gatewayRegion: 'eu-west-1' },
-  { id: '8', timestamp: '2026-03-10 14:30:38', user: 'alice@acme.com', sourceIp: '10.0.2.18', action: 'deny', destination: 'spyware-drop.ru', category: 'Spyware', policyName: 'Block Malware & Phishing', bytesIn: 0, bytesOut: 410, severity: 'critical', gatewayRegion: 'us-east-1' },
-  { id: '9', timestamp: '2026-03-10 14:30:22', user: 'frank@acme.com', sourceIp: '10.0.1.91', action: 'monitor', destination: 'unknown-saas.io', category: 'Uncategorized', policyName: 'Default Allow', bytesIn: 12800, bytesOut: 880, severity: 'low', gatewayRegion: 'ap-southeast-1' },
-  { id: '10', timestamp: '2026-03-10 14:30:10', user: 'bob@acme.com', sourceIp: '10.0.1.87', action: 'allow', destination: 'jira.atlassian.com', category: 'SaaS', policyName: 'Allow Sanctioned SaaS', bytesIn: 33400, bytesOut: 2500, severity: 'info', gatewayRegion: 'us-west-2' },
-];
+// LogEntry is imported from '@/lib/security-events-api' (single source of truth).
+// Events are fetched live and tenant-scoped by the global X-Scope-Tenant-ID
+// interceptor — there is no demo/fallback data.
 
 /* ─── Style maps ────────────────────────────────────────────── */
 const severityColor: Record<string, string> = {
@@ -233,7 +209,10 @@ function getEnrichedLogDetail(log: LogEntry) {
    PAGE COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 export default function LogsPage() {
-  const [logs] = useState<LogEntry[]>(demoLogs);
+  /* Live, tenant-scoped security events (replaces the old demo data source). */
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
@@ -279,6 +258,27 @@ export default function LogsPage() {
     setAiQuery(text);
     runAiAnalysis(text);
   });
+
+  /* ── Fetch tenant-scoped security events (on mount + Refresh) ─────
+     Tenant scope is stamped by the global X-Scope-Tenant-ID interceptor;
+     no demo/fallback data is ever shown. */
+  const loadEvents = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const events = await listSecurityEvents();
+      setLogs(events);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to load security events';
+      setError(msg);
+      setLogs([]);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
 
   /* ── Filtered logs ──────────────────────────────────────── */
   const filtered = useMemo(() => logs.filter(log => {
@@ -344,7 +344,7 @@ export default function LogsPage() {
         <div className="flex items-center gap-3">
           <FileText size={24} className="text-blue-400" />
           <div>
-            <h1 className="text-xl font-semibold">Logs &amp; Events</h1>
+            <h1 className="text-xl font-semibold">Security Events</h1>
             <p className="text-sm text-gray-500">Real-time traffic logs, security events, and audit trail</p>
           </div>
         </div>
@@ -380,8 +380,12 @@ export default function LogsPage() {
             <Download size={14} />
             Export
           </button>
-          <button className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">
-            <RefreshCw size={14} />
+          <button
+            onClick={() => loadEvents()}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={clsx(loading && 'animate-spin')} />
             Refresh
           </button>
         </div>
@@ -597,8 +601,32 @@ export default function LogsPage() {
         ))}
       </div>
 
+      {/* ─── Error banner ───────────────────────────────────── */}
+      {error && !loading && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-300">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => loadEvents()} className="text-xs text-red-200 hover:text-white underline">Retry</button>
+        </div>
+      )}
+
       {/* ─── Log table ──────────────────────────────────────── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-gray-400 text-sm">
+            <Loader2 size={16} className="animate-spin" /> Loading security events…
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-gray-500 text-sm">
+            <AlertTriangle size={22} className="text-red-500/70" />
+            Could not load security events.
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-gray-500 text-sm">
+            <FileText size={24} className="text-gray-600" />
+            No security events for this tenant yet.
+          </div>
+        ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-800/50 text-gray-400 text-xs uppercase tracking-wider">
@@ -616,6 +644,13 @@ export default function LogsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800/50">
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={11} className="px-3 py-12 text-center text-gray-500 text-sm">
+                  No events match your filters.
+                </td>
+              </tr>
+            )}
             {filtered.map(log => {
               const isExpanded = expandedLogId === log.id;
               const detail = isExpanded ? getEnrichedLogDetail(log) : null;
@@ -858,6 +893,7 @@ export default function LogsPage() {
             })}
           </tbody>
         </table>
+        )}
       </div>
 
       {/* Page Events Tracker Panel */}

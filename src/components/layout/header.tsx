@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation';
 import {
   Bell, Search, LogOut, Settings, Shield,
   ChevronDown, AlertTriangle, CheckCircle, Info, X,
-  Bug, Keyboard, Menu,
+  Bug, Keyboard, Menu, Compass, Sparkles,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
+import { useUiPanels } from '@/lib/ui-panels';
 import { TenantSwitcher } from './tenant-switcher';
 
 /* Notification data */
@@ -39,6 +40,11 @@ const notifIcon: Record<string, { icon: typeof AlertTriangle; color: string }> =
 export function Header({ onMenuToggle }: { onMenuToggle?: () => void } = {}) {
   const router = useRouter();
   const { user, signOut, isDevMode, ssoMethod } = useAuthStore();
+  // Bridges to the always-mounted overlay components (separate React subtrees):
+  // start the guided tour and toggle the AI assistant panel from the top menu.
+  const startTour = useUiPanels((s) => s.startTour);
+  const toggleAi = useUiPanels((s) => s.toggleAi);
+  const aiOpen = useUiPanels((s) => s.aiOpen);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [notifications, setNotifications] = useState(demoNotifications);
@@ -112,6 +118,27 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void } = {}) {
             DEV
           </span>
         )}
+
+        {/* ─── Product tour ─── */}
+        <button
+          onClick={startTour}
+          title="Product tour"
+          aria-label="Start product tour"
+          className="p-2 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all"
+        >
+          <Compass size={17} />
+        </button>
+
+        {/* ─── AI assistant ─── */}
+        <button
+          onClick={toggleAi}
+          title="AI assistant (Ctrl K)"
+          aria-label="Open AI assistant"
+          aria-pressed={aiOpen}
+          className={`p-2 rounded-lg transition-all ${aiOpen ? 'text-blue-400 bg-blue-500/10' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'}`}
+        >
+          <Sparkles size={17} />
+        </button>
 
         {/* ─── Notifications ─── */}
         <div className="relative" ref={notifRef}>

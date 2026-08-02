@@ -9,7 +9,7 @@ const navGroups = [
     label: 'Dashboard',
     items: [
       { href: '/', label: 'Overview' },
-      { href: '/logs', label: 'Logs & Events' },
+      { href: '/logs', label: 'Security Events' },
       { href: '/endpoint-events', label: 'Endpoint Events' },
     ],
   },
