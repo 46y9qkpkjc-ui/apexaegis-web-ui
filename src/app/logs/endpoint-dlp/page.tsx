@@ -2,6 +2,8 @@
 import React, { useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import { ShieldAlert, Search, Clipboard, Printer, Usb } from 'lucide-react';
+import { useAuthStore } from '@/lib/auth-store';
+import { brandForUser } from '@/lib/brands';
 
 const CHANNELS: Record<string, { icon: typeof Usb; label: string }> = {
   'copy-paste': { icon: Clipboard, label: 'Copy / Paste' },
@@ -9,6 +11,12 @@ const CHANNELS: Record<string, { icon: typeof Usb; label: string }> = {
   usb: { icon: Usb, label: 'USB' },
 };
 
+// INTERIM DEMO-SCOPING — there is no backend endpoint-DLP feed yet (real events
+// arrive from future agent work). These placeholder rows deliberately span several
+// tenants; we filter them to the logged-in tenant at render time so a tenant admin
+// (e.g. Evelyn/Aspire) never sees another tenant's rows. Each demo row encodes its
+// tenant in the sender's email domain (user1@aspire.example -> "aspire"). Drop this
+// scoping and read the tenant-scoped API once the real DLP feed lands.
 const events = [
   { time: '2m ago', user: 'frank@dbs.example', device: 'dbs-windows-3', channel: 'usb', data: 'Customer PII (2,041 records)', action: 'blocked', sev: 'critical' },
   { time: '9m ago', user: 'anderson@ibm.example', device: 'ibm-macos-2', channel: 'copy-paste', data: 'Source code snippet', action: 'blocked', sev: 'high' },
@@ -18,6 +26,9 @@ const events = [
   { time: '1h ago', user: 'user3@hpe.example', device: 'hpe-macos-5', channel: 'print', data: 'Internal roadmap', action: 'monitor', sev: 'medium' },
 ];
 
+// Tenant slug carried in a demo row's email domain: "user1@aspire.example" -> "aspire".
+const tenantOfRow = (email: string) => (email.split('@')[1] ?? '').split('.')[0];
+
 const sevColor: Record<string, string> = {
   critical: 'bg-red-900/30 text-red-400', high: 'bg-orange-900/30 text-orange-400',
   medium: 'bg-yellow-900/30 text-yellow-400', info: 'bg-gray-800 text-gray-400',
@@ -26,10 +37,18 @@ const sevColor: Record<string, string> = {
 export default function EndpointDLPLogPage() {
   const [search, setSearch] = useState('');
   const [channel, setChannel] = useState('all');
-  const rows = useMemo(() => events.filter(e =>
+  // Current tenant for a plain tenant admin (consumer): the brand slug resolved
+  // from their identity — "aspire" for evelyn.ng.aspire@apexaegis.app. MSP/super-
+  // admin users resolve to their operator/platform brand, which matches no demo
+  // row, so they get the empty state rather than another tenant's data (interim:
+  // the switcher's active-tenant isn't wired to this placeholder feed yet).
+  const user = useAuthStore(s => s.user);
+  const tenant = brandForUser(user);
+  const tenantRows = useMemo(() => events.filter(e => tenantOfRow(e.user) === tenant), [tenant]);
+  const rows = useMemo(() => tenantRows.filter(e =>
     (channel === 'all' || e.channel === channel) &&
     (!search || e.user.includes(search.toLowerCase()) || e.data.toLowerCase().includes(search.toLowerCase()))
-  ), [search, channel]);
+  ), [tenantRows, search, channel]);
 
   return (
     <div className="space-y-6">
@@ -40,6 +59,15 @@ export default function EndpointDLPLogPage() {
         <p className="text-sm text-gray-400 mt-1">Data exfiltration attempts detected on endpoints — copy/paste, print, and USB channels.</p>
       </div>
 
+      {tenantRows.length === 0 ? (
+        // Interim empty state — never fall through to another tenant's rows.
+        <div className="bg-gray-900/40 border border-gray-800 rounded-xl px-6 py-16 text-center">
+          <ShieldAlert className="mx-auto text-gray-600" size={28} />
+          <p className="mt-3 text-sm text-gray-400">No DLP events for this tenant yet</p>
+          <p className="mt-1 text-xs text-gray-600">Endpoint DLP telemetry appears here once the agent feed is live.</p>
+        </div>
+      ) : (
+      <>
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -89,6 +117,8 @@ export default function EndpointDLPLogPage() {
           </tbody>
         </table>
       </div>
+      </>
+      )}
     </div>
   );
 }

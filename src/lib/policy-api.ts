@@ -11,6 +11,8 @@ export interface ApiPolicy {
   name: string;
   sequence: number;
   enabled: boolean;
+  /** Catch-all "default deny": always evaluated LAST, regardless of sequence. */
+  is_default?: boolean;
   action: string;
   traffic_steering: string[];
   access_methods: string[];
@@ -46,7 +48,9 @@ export function toApiPolicy(p: any): Partial<ApiPolicy> {
     name: p.name,
     sequence: p.seq ?? 0,
     enabled: p.enabled ?? true,
-    action: p.action,
+    // A default catch-all is always a deny; force it so the flag and action can never disagree.
+    action: p.isDefault ? 'deny' : p.action,
+    is_default: p.isDefault ?? false,
     traffic_steering: Array.isArray(p.trafficSteering) ? p.trafficSteering : [p.trafficSteering],
     access_methods: p.accessMethod ?? [],
     source_users: p.sourceUsers ?? [],
@@ -81,6 +85,7 @@ export function fromApiPolicy(p: ApiPolicy): any {
     seq: p.sequence,
     name: p.name,
     enabled: p.enabled,
+    isDefault: p.is_default ?? false,
     trafficSteering: Array.isArray(p.traffic_steering) ? p.traffic_steering[0] ?? 'internet' : 'internet',
     accessMethod: p.access_methods ?? [],
     sourceUsers: p.source_users ?? [],
@@ -111,7 +116,9 @@ export async function fetchPolicies(): Promise<{ policies: any[]; version: numbe
   if (!res.ok) throw new Error(`Failed to fetch policies: ${res.status}`);
   const data = await res.json();
   const policies = (data.policies ?? []).map(fromApiPolicy);
-  policies.sort((a: any, b: any) => (a.seq ?? 0) - (b.seq ?? 0));
+  // Default catch-all policies always sort last, regardless of seq — mirrors the
+  // backend's `ORDER BY is_default, sequence`.
+  policies.sort((a: any, b: any) => (Number(!!a.isDefault) - Number(!!b.isDefault)) || ((a.seq ?? 0) - (b.seq ?? 0)));
   return { policies, version: data.version ?? 0 };
 }
 

@@ -79,6 +79,8 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
   const [wafConfig, setWafConfig] = useState<WafConfig>(policy?.wafConfig || DEFAULT_WAF_CONFIG);
 
   const [action, setAction] = useState<string>(policy?.action || 'allow');
+  // Default deny (catch-all): always evaluated last; forces action to deny.
+  const [isDefault, setIsDefault] = useState<boolean>(policy?.isDefault ?? false);
   const [logTraffic, setLogTraffic] = useState(policy?.logTraffic ?? true);
   const [ackNonCompliant, setAckNonCompliant] = useState<boolean>(false);
 
@@ -179,7 +181,9 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
       aimlAnomaly: isPrivate ? aimlAnomaly : false,
       uebaEnabled: !isDns ? uebaEnabled : false,
       riskThreshold: !isDns && uebaEnabled ? riskThreshold : null,
-      action, logTraffic,
+      action: isDefault ? 'deny' : action,
+      isDefault,
+      logTraffic,
       contentInspection: isInternet && contentInspection.enabled ? contentInspection : null,
       activityControls: isInternet && activityControls.enabled ? activityControls : null,
       wafConfig: isPrivate && wafConfig.enabled ? wafConfig : null,
@@ -371,10 +375,22 @@ export function PolicyEditor({ policy, onClose, onSave, existingPolicies = [] }:
 
           {/* Action + compliance gate */}
           <Section title="Action">
+            <label className="flex items-start gap-2 p-3 rounded-lg bg-gray-800/40 border border-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isDefault}
+                onChange={e => { const on = e.target.checked; setIsDefault(on); if (on) setAction('deny'); }}
+                className="mt-0.5 rounded border-gray-600"
+              />
+              <span className="text-sm">
+                <span className="font-medium text-gray-200">Default deny (catch-all — always evaluated last)</span>
+                <span className="block text-xs text-gray-500">Evaluated after every other policy, regardless of sequence. Action is forced to Deny.</span>
+              </span>
+            </label>
             <div className="flex gap-2">
               {['allow', 'deny', 'monitor'].map(a => (
-                <button key={a} onClick={() => setAction(a)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                <button key={a} onClick={() => setAction(a)} disabled={isDefault && a !== 'deny'}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors border disabled:opacity-30 disabled:cursor-not-allowed ${
                     action === a
                       ? a === 'allow' ? 'bg-green-900/40 border-green-600 text-green-400'
                         : a === 'deny' ? 'bg-red-900/40 border-red-600 text-red-400'

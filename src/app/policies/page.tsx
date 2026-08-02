@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, Plus, GripVertical, ChevronDown, ChevronUp, Pencil, Trash2, Copy, Power, Play } from 'lucide-react';
+import { Shield, Plus, GripVertical, ChevronDown, ChevronUp, Pencil, Trash2, Copy, Power, Play, Lock } from 'lucide-react';
 import { InlineObjectCreator } from '@/components/policies/inline-object-creator';
 import { PolicyEditor } from '@/components/policies/policy-editor';
 import { PolicyEngineVisualization } from '@/components/policies/policy-engine-viz';
@@ -36,6 +36,8 @@ interface SecurityPolicy {
   iapConfig: any | null;
   action: 'allow' | 'deny' | 'monitor';
   logTraffic: boolean;
+  // Catch-all "default deny": pinned to the bottom, always evaluated last.
+  isDefault?: boolean;
 }
 
 // Demo data
@@ -100,12 +102,15 @@ export default function PoliciesPage() {
   const loadPolicies = useCallback(async () => {
     try {
       const { policies: apiPolicies } = await fetchPolicies();
-      if (apiPolicies.length > 0) {
-        setPolicies(apiPolicies);
-        setApiConnected(true);
-      }
+      // A successful fetch means the backend is reachable — treat as connected even
+      // when the tenant has zero policies (e.g. Aspire). The old `length > 0` gate
+      // left apiConnected=false for such tenants, so every write (create/edit/delete/
+      // reorder) was skipped and only added to React state → vanished on refresh.
+      // Show real data (even empty), never the cross-tenant demo, when connected.
+      setPolicies(apiPolicies);
+      setApiConnected(true);
     } catch {
-      // Backend unreachable — use demo policies
+      // Backend unreachable — keep the demo policies as an offline fallback only.
       setApiConnected(false);
     }
   }, []);
@@ -297,30 +302,38 @@ export default function PoliciesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800/50">
-            {policies.map((policy) => (
+            {[...policies].sort((a, b) => Number(!!a.isDefault) - Number(!!b.isDefault)).map((policy) => (
               <tr
                 key={policy.id}
-                className={`hover:bg-gray-800/30 transition-colors ${!policy.enabled ? 'opacity-40' : ''} ${draggedId === policy.id ? 'opacity-30' : ''} ${dragOverId === policy.id && draggedId !== policy.id ? 'border-t-2 border-t-blue-500' : ''}`}
-                onDragOver={e => { e.preventDefault(); setDragOverId(policy.id); }}
+                className={`hover:bg-gray-800/30 transition-colors ${!policy.enabled ? 'opacity-40' : ''} ${draggedId === policy.id ? 'opacity-30' : ''} ${dragOverId === policy.id && draggedId !== policy.id ? 'border-t-2 border-t-blue-500' : ''} ${policy.isDefault ? 'bg-gray-950/40' : ''}`}
+                onDragOver={e => { if (policy.isDefault) return; e.preventDefault(); setDragOverId(policy.id); }}
                 onDragLeave={() => setDragOverId(null)}
-                onDrop={e => { e.preventDefault(); handleDrop(policy.id); }}
+                onDrop={e => { if (policy.isDefault) return; e.preventDefault(); handleDrop(policy.id); }}
               >
                 <td
-                  className="px-3 py-3 text-gray-600 cursor-grab"
-                  draggable
-                  onDragStart={() => setDraggedId(policy.id)}
+                  className={`px-3 py-3 text-gray-600 ${policy.isDefault ? 'cursor-not-allowed' : 'cursor-grab'}`}
+                  draggable={!policy.isDefault}
+                  onDragStart={() => { if (!policy.isDefault) setDraggedId(policy.id); }}
                   onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
+                  title={policy.isDefault ? 'Default catch-all — always evaluated last' : undefined}
                 >
-                  <GripVertical size={14} />
+                  {policy.isDefault ? <Lock size={14} /> : <GripVertical size={14} />}
                 </td>
-                <td className="px-3 py-3 text-gray-500 font-mono text-xs">{policy.seq}</td>
+                <td className="px-3 py-3 text-gray-500 font-mono text-xs">{policy.isDefault ? '∞' : policy.seq}</td>
                 <td className="px-3 py-3">
-                  <button
-                    onClick={() => handleEdit(policy)}
-                    className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
-                  >
-                    {policy.name}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleEdit(policy)}
+                      className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      {policy.name}
+                    </button>
+                    {policy.isDefault && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-[10px] border border-gray-700 uppercase tracking-wide">
+                        <Lock size={9} /> always last
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-3">
                   <div className="space-y-0.5">
@@ -429,12 +442,16 @@ export default function PoliciesPage() {
                     <button onClick={() => handleDeletePolicy(policy.id)} className="p-1 text-gray-500 hover:text-red-400 transition-colors" title="Delete">
                       <Trash2 size={14} />
                     </button>
-                    <button onClick={() => handleMoveUp(policy.id)} className="p-1 text-gray-500 hover:text-green-400 transition-colors" title="Move Up">
-                      <ChevronUp size={14} />
-                    </button>
-                    <button onClick={() => handleMoveDown(policy.id)} className="p-1 text-gray-500 hover:text-green-400 transition-colors" title="Move Down">
-                      <ChevronDown size={14} />
-                    </button>
+                    {!policy.isDefault && (
+                      <>
+                        <button onClick={() => handleMoveUp(policy.id)} className="p-1 text-gray-500 hover:text-green-400 transition-colors" title="Move Up">
+                          <ChevronUp size={14} />
+                        </button>
+                        <button onClick={() => handleMoveDown(policy.id)} className="p-1 text-gray-500 hover:text-green-400 transition-colors" title="Move Down">
+                          <ChevronDown size={14} />
+                        </button>
+                      </>
+                    )}
                     <div className="relative group">
                       <button className="p-1 text-gray-500 hover:text-purple-400 transition-colors" title="Insert policy">
                         <Plus size={14} />

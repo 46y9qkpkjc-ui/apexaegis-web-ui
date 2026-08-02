@@ -2,7 +2,15 @@
 import React, { useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import { Network, Search } from 'lucide-react';
+import { useAuthStore } from '@/lib/auth-store';
+import { brandForUser } from '@/lib/brands';
 
+// INTERIM DEMO-SCOPING — there is no backend transit-DLP feed yet (real detections
+// arrive from future SSL-inspection work). These placeholder rows deliberately span
+// several tenants; we filter them to the logged-in tenant at render time so a tenant
+// admin (e.g. Evelyn/Aspire) never sees another tenant's rows. Each demo row encodes
+// its tenant in the sender's email domain (user1@aspire.example -> "aspire"). Drop
+// this scoping and read the tenant-scoped API once the real DLP feed lands.
 const events = [
   { time: '1m ago', user: 'anderson@ibm.example', dest: 'https://paste.ee', classifier: 'Source code', match: 92, action: 'blocked', sev: 'high' },
   { time: '6m ago', user: 'frank@dbs.example', dest: 'https://drive.google.com (personal)', classifier: 'PII — NRIC', match: 98, action: 'blocked', sev: 'critical' },
@@ -12,6 +20,9 @@ const events = [
   { time: '58m ago', user: 'user3@hpe.example', dest: 'ftp://203.0.113.9', classifier: 'PII — email list', match: 84, action: 'blocked', sev: 'high' },
 ];
 
+// Tenant slug carried in a demo row's email domain: "user1@aspire.example" -> "aspire".
+const tenantOfRow = (email: string) => (email.split('@')[1] ?? '').split('.')[0];
+
 const sevColor: Record<string, string> = {
   critical: 'bg-red-900/30 text-red-400', high: 'bg-orange-900/30 text-orange-400',
   medium: 'bg-yellow-900/30 text-yellow-400', info: 'bg-gray-800 text-gray-400',
@@ -19,9 +30,17 @@ const sevColor: Record<string, string> = {
 
 export default function TransitDLPLogPage() {
   const [search, setSearch] = useState('');
-  const rows = useMemo(() => events.filter(e =>
+  // Current tenant for a plain tenant admin (consumer): the brand slug resolved
+  // from their identity — "aspire" for evelyn.ng.aspire@apexaegis.app. MSP/super-
+  // admin users resolve to their operator/platform brand, which matches no demo
+  // row, so they get the empty state rather than another tenant's data (interim:
+  // the switcher's active-tenant isn't wired to this placeholder feed yet).
+  const user = useAuthStore(s => s.user);
+  const tenant = brandForUser(user);
+  const tenantRows = useMemo(() => events.filter(e => tenantOfRow(e.user) === tenant), [tenant]);
+  const rows = useMemo(() => tenantRows.filter(e =>
     !search || e.user.includes(search.toLowerCase()) || e.classifier.toLowerCase().includes(search.toLowerCase()) || e.dest.toLowerCase().includes(search.toLowerCase())
-  ), [search]);
+  ), [tenantRows, search]);
 
   return (
     <div className="space-y-6">
@@ -32,6 +51,15 @@ export default function TransitDLPLogPage() {
         <p className="text-sm text-gray-400 mt-1">Data exfiltration detected in network traffic by the DLP classifier (in-line inspection).</p>
       </div>
 
+      {tenantRows.length === 0 ? (
+        // Interim empty state — never fall through to another tenant's rows.
+        <div className="bg-gray-900/40 border border-gray-800 rounded-xl px-6 py-16 text-center">
+          <Network className="mx-auto text-gray-600" size={28} />
+          <p className="mt-3 text-sm text-gray-400">No DLP events for this tenant yet</p>
+          <p className="mt-1 text-xs text-gray-600">Transit DLP detections appear here once in-line inspection is live.</p>
+        </div>
+      ) : (
+      <>
       <div className="relative w-56">
         <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search user / classifier…"
@@ -69,6 +97,8 @@ export default function TransitDLPLogPage() {
           </tbody>
         </table>
       </div>
+      </>
+      )}
     </div>
   );
 }
