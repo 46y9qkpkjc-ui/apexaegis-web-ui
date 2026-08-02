@@ -16,6 +16,9 @@ export interface DeviceRow {
   tenant_name: string;
   tenant_id: string;
   user: string;
+  swg_connected: boolean;
+  dc_tunnel_connected: boolean;
+  ot_mode: boolean;
 }
 
 export async function fetchDevices(tenantId?: string): Promise<DeviceRow[]> {

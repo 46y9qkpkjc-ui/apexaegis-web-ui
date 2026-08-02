@@ -18,6 +18,13 @@ const tunnelChip: Record<TunnelState, string> = {
   Offline: 'text-gray-400 border-gray-700 bg-gray-800/40',
 };
 
+// Per-PEP status chip palette (matches the compliance/tunnel chip styling).
+const pepChip = {
+  green: 'text-green-400 border-green-800 bg-green-900/20',
+  cyan: 'text-cyan-400 border-cyan-800 bg-cyan-900/20',
+  gray: 'text-gray-400 border-gray-700 bg-gray-800/40',
+};
+
 function timeAgo(iso: string): string {
   if (!iso) return '—';
   const t = new Date(iso).getTime();
@@ -91,13 +98,15 @@ export default function EndpointEventsPage() {
                 <th className="text-left font-medium px-4 py-2">OS</th>
                 <th className="text-left font-medium px-4 py-2">Compliance</th>
                 <th className="text-left font-medium px-4 py-2">Tunnel</th>
-                <th className="text-left font-medium px-4 py-2">Last seen</th>
+                <th className="text-left font-medium px-4 py-2">SWG PEP</th>
+                <th className="text-left font-medium px-4 py-2">AD/DC PEP</th>
+                <th className="text-left font-medium px-4 py-2">Check-in</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">Loading…</td></tr>}
+              {loading && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-500">Loading…</td></tr>}
               {!loading && devices.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">No endpoint devices for this tenant yet</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-500">No endpoint devices for this tenant yet</td></tr>
               )}
               {devices.map(d => {
                 const tunnel = tunnelStatus(d.last_seen);
@@ -116,6 +125,17 @@ export default function EndpointEventsPage() {
                     </td>
                     <td className="px-4 py-2.5">
                       <span className={clsx('text-[11px] px-1.5 py-0.5 rounded border', tunnelChip[tunnel])}>{tunnel}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className={clsx('text-[11px] px-1.5 py-0.5 rounded border', d.swg_connected ? pepChip.green : pepChip.gray)}>
+                        {d.swg_connected ? 'Connected' : 'Disconnected'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className={clsx('text-[11px] px-1.5 py-0.5 rounded border',
+                        d.dc_tunnel_connected ? pepChip.green : (d.ot_mode ? pepChip.cyan : pepChip.gray))}>
+                        {d.dc_tunnel_connected ? 'Tunnel up' : (d.ot_mode ? 'Native (DC-adjacent)' : 'Disconnected')}
+                      </span>
                     </td>
                     <td className="px-4 py-2.5 text-gray-400 text-[12px]">{timeAgo(d.last_seen)}</td>
                   </tr>
