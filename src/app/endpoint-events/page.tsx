@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { MonitorSmartphone, RefreshCw } from 'lucide-react';
+import { MonitorSmartphone, RefreshCw, ShieldAlert } from 'lucide-react';
 import { fetchDevices, type DeviceRow } from '@/lib/device-api';
+import { listDnsEvents, type DnsEventRow } from '@/lib/dns-events-api';
 
 const complianceChip: Record<string, string> = {
   compliant: 'text-green-400 border-green-800 bg-green-900/20',
@@ -47,15 +48,25 @@ function tunnelStatus(lastSeen: string): TunnelState {
   return 'Offline';
 }
 
+// DNS-PEP deny risk score → colour (risk-engine bands: deny 65-100, monitor 25-64).
+const dnsRiskColor = (s: number) =>
+  typeof s !== 'number' || isNaN(s) ? 'text-gray-400' : s >= 65 ? 'text-red-400' : s >= 25 ? 'text-amber-400' : 'text-gray-300';
+
 export default function EndpointEventsPage() {
   const [devices, setDevices] = useState<DeviceRow[]>([]);
+  const [dnsRows, setDnsRows] = useState<DnsEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
-      const d = await fetchDevices();
+      // DNS denies are secondary — a failure there must not blank the device table.
+      const [d, dns] = await Promise.all([
+        fetchDevices(),
+        listDnsEvents().catch(() => [] as DnsEventRow[]),
+      ]);
       setDevices(d);
+      setDnsRows(dns);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
@@ -143,6 +154,50 @@ export default function EndpointEventsPage() {
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* DNS PEP — blocked domains (endpoint sinkhole denies; observability only) */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-2">
+          <ShieldAlert size={16} className="text-red-400" /> DNS PEP — Blocked Domains
+          <span className="text-[11px] font-normal text-gray-500">
+            what the on-device resolver sinkholed — blocking is local, this is the report
+          </span>
+        </h2>
+        <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                  <th className="text-left font-medium px-4 py-2">Device</th>
+                  <th className="text-left font-medium px-4 py-2">Domain</th>
+                  <th className="text-center font-medium px-4 py-2">Risk</th>
+                  <th className="text-right font-medium px-4 py-2">Denies</th>
+                  <th className="text-left font-medium px-4 py-2">Last blocked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!loading && dnsRows.length === 0 && (
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                    No DNS-PEP denies reported yet — appears once an endpoint sinkholes a risky or denylisted domain.
+                  </td></tr>
+                )}
+                {dnsRows.map((r, i) => (
+                  <tr key={`${r.device_id}|${r.domain}|${i}`} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                    <td className="px-4 py-2.5 font-mono text-[12px] text-gray-200">{r.device_name || '—'}</td>
+                    <td className="px-4 py-2.5 font-mono text-[12px] text-gray-300">{r.domain}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className={clsx('font-mono font-bold', dnsRiskColor(r.score))}>{r.score}</span>
+                      <span className="text-gray-600 text-[10px]"> /100</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono text-[12px] text-gray-300">{r.count}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-[12px]">{timeAgo(r.last_seen)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
