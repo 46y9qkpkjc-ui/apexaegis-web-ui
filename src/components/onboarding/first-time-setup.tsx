@@ -23,6 +23,12 @@ const SHOWN_KEY = 'aa_setup_shown_at';
 const FRAMEWORKS_KEY = 'aa_governance_frameworks';
 const REDISPLAY_MS = 45 * 60 * 1000; // 45 minutes
 
+// Self-serve auto-trigger: the /vdi gate records each OTP-verified viewer; the wizard
+// polls this signal and opens for each fresh viewer (no presenter needed).
+const ACCESS_ENDPOINT = 'https://apexastute.com/api/demo-access/latest';
+const ACCESS_SEEN_KEY = 'aa_last_access_seen';
+const ACCESS_POLL_MS = 20000;
+
 interface Framework {
   id: string; name: string; desc: string;
   icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
@@ -72,6 +78,31 @@ export function FirstTimeSetup() {
     window.addEventListener('aa:open-setup', h);
     return () => window.removeEventListener('aa:open-setup', h);
   }, [openNow]);
+
+  // Self-serve auto-trigger: poll the gate's "latest access" timestamp. When a new viewer
+  // verifies at apexastute.com/vdi, open the wizard for them. The first poll only syncs a
+  // baseline (never opens on historical access); fail-soft if apexastute is unreachable.
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetch(ACCESS_ENDPOINT, { cache: 'no-store' });
+        if (!res.ok || cancelled) return;
+        const { at } = await res.json() as { at?: number };
+        if (!at) return;
+        let seen = 0;
+        try { seen = Number(localStorage.getItem(ACCESS_SEEN_KEY) || 0); } catch { /* ignore */ }
+        if (at > seen) {
+          try { localStorage.setItem(ACCESS_SEEN_KEY, String(at)); } catch { /* ignore */ }
+          if (seen > 0) openNow(); // only after a baseline exists
+        }
+      } catch { /* apexastute unreachable — timer + wand button still cover it */ }
+    };
+    check();
+    const id = setInterval(check, ACCESS_POLL_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [accessToken, openNow]);
 
   // Provisioning animation → advances through the chosen frameworks, then to "done".
   useEffect(() => {
