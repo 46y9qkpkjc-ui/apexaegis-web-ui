@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import {
   Bell, Search, LogOut, Settings, Shield,
   ChevronDown, AlertTriangle, CheckCircle, Info, X,
-  Bug, Keyboard, Menu, Compass, Sparkles,
+  Bug, Keyboard, Menu, Compass, Sparkles, Wand2,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
 import { useUiPanels } from '@/lib/ui-panels';
@@ -118,6 +118,16 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void } = {}) {
             DEV
           </span>
         )}
+
+        {/* ─── First-time setup (re-runnable on demand) ─── */}
+        <button
+          onClick={() => window.dispatchEvent(new Event('aa:open-setup'))}
+          title="Run first-time setup"
+          aria-label="Run first-time setup"
+          className="p-2 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all"
+        >
+          <Wand2 size={17} />
+        </button>
 
         {/* ─── Product tour ─── */}
         <button

@@ -9,6 +9,7 @@ import { BrandApplier } from './brand-applier';
 import { useTenantContext } from '@/lib/tenant-context';
 import { FeatureProvider } from '@/hooks/use-features';
 import { GuidedTour, type TourStep } from '@/components/guided-tour';
+import { FirstTimeSetup } from '@/components/onboarding/first-time-setup';
 
 const TOUR_STEPS: TourStep[] = [
   { title: 'Welcome to ApexAegis', body: 'A 30-second tour of your managed SASE console — navigation, tenant scoping, and the tools you use most.' },
@@ -123,6 +124,7 @@ export function LayoutShell({ children }: Readonly<{ children: React.ReactNode }
       </div>
     </div>
     <GuidedTour steps={TOUR_STEPS} storageKey="apexaegis-webui-tour-v1" label="Product tour" />
+    <FirstTimeSetup />
     </FeatureProvider>
   );
 }
