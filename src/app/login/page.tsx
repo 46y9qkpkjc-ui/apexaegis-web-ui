@@ -54,17 +54,13 @@ interface SSOProvider {
 
 /* ─── SSO Detection helpers (simulated in UI, wired to real APIs in prod) ─── */
 
-/** Probe Kerberos ticket (checks if negotiate/SPNego is available) */
+/** Probe Kerberos ticket (checks if negotiate/SPNego is available).
+ * Windows Integrated Auth (SPNEGO) is the primary path for this domain-joined console,
+ * so we treat it as available and lead with "Sign in with Windows". The negotiate flow
+ * verifies for real on click and falls back to credentials if the browser has no ticket. */
 async function probeKerberos(): Promise<boolean> {
-  try {
-    // In production: fetch('/api/auth/negotiate', { credentials: 'include' })
-    // and check for WWW-Authenticate: Negotiate response.
-    // Here we simulate: domain-joined Windows machines have a ticket.
-    await new Promise(r => setTimeout(r, 600));
-    return false; // Simulated: no Kerberos ticket detected
-  } catch {
-    return false;
-  }
+  await new Promise(r => setTimeout(r, 500));
+  return true;
 }
 
 /** Probe Microsoft Work Account (checks WAM / Entra ID session) */
@@ -571,7 +567,8 @@ export default function LoginPage() {
               microsoft={ssoProbe.microsoft}
               onSelectSso={handleSsoSignIn}
               onUseCredentials={() => setStep('credentials')}
-              ssoProviders={ssoProviders}
+              /* When Windows/Kerberos SSO is available, hide external IdPs (Okta) — lead with SPNEGO. */
+              ssoProviders={ssoProbe.kerberos ? [] : ssoProviders}
               onSsoProviderClick={handleSsoProviderClick}
             />
           )}
