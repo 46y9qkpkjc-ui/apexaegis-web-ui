@@ -24,6 +24,8 @@ import { useAuthStore } from '@/lib/auth-store';
 const ACCENT = '#6D4AFF';
 const SHOWN_KEY = 'aa_setup_shown_at';
 const FRAMEWORKS_KEY = 'aa_governance_frameworks';
+const CONFIG_KEY = 'aa_governance_config';        // full persisted posture (all selections)
+const COMPLETED_KEY = 'aa_governance_completed';   // ISO timestamp when setup was completed
 const REDISPLAY_MS = 45 * 60 * 1000; // 45 minutes
 
 // Self-serve auto-trigger: the /vdi gate records each OTP-verified viewer; the wizard
@@ -97,11 +99,32 @@ export function FirstTimeSetup() {
   const [discovered, setDiscovered] = useState<string[]>(DISCOVERED_APPS.map(a => a.id));
   const [ids, setIds] = useState('balanced');
   const [av, setAv] = useState('cloud');
+  const [completedAt, setCompletedAt] = useState<string | null>(null);
+
+  // Load any previously-saved posture so a returning admin sees their real config.
+  const applyPersisted = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(CONFIG_KEY);
+      if (raw) {
+        const c = JSON.parse(raw) as Record<string, unknown>;
+        if (Array.isArray(c.selected)) setSelected(c.selected as string[]);
+        if (Array.isArray(c.denyCats)) setDenyCats(c.denyCats as string[]);
+        if (typeof c.dpi === 'string') setDpi(c.dpi);
+        if (Array.isArray(c.sanctioned)) setSanctioned(c.sanctioned as string[]);
+        if (typeof c.tenantId === 'string' && c.tenantId) setTenantId(c.tenantId);
+        if (Array.isArray(c.discovered)) setDiscovered(c.discovered as string[]);
+        if (typeof c.ids === 'string') setIds(c.ids);
+        if (typeof c.av === 'string') setAv(c.av);
+      }
+      setCompletedAt(localStorage.getItem(COMPLETED_KEY));
+    } catch { /* ignore */ }
+  }, []);
 
   const openNow = useCallback(() => {
+    applyPersisted();
     setStep(STEP_WELCOME); setProvisionIdx(0); setOpen(true);
     try { localStorage.setItem(SHOWN_KEY, String(Date.now())); } catch { /* private mode */ }
-  }, []);
+  }, [applyPersisted]);
 
   // Prefill tenant ID from the signed-in session if available.
   useEffect(() => {
@@ -110,11 +133,14 @@ export function FirstTimeSetup() {
     if (t && !tenantId) setTenantId(t);
   }, [user, tenantId]);
 
-  // Timer-gated auto-open: first authed paint, then only if >45min since last shown.
+  // Auto-open: always show until the admin COMPLETES setup; once completed, re-show only
+  // on the 45-min demo timer (pre-filled + closable) so each fresh CIO/CISO session gets
+  // the experience without nagging a returning admin.
   useEffect(() => {
     if (!accessToken) return;
-    let last = 0;
-    try { last = Number(localStorage.getItem(SHOWN_KEY) || 0); } catch { /* ignore */ }
+    let completed: string | null = null, last = 0;
+    try { completed = localStorage.getItem(COMPLETED_KEY); last = Number(localStorage.getItem(SHOWN_KEY) || 0); } catch { /* ignore */ }
+    if (!completed) { openNow(); return; }
     if (!last || Date.now() - last > REDISPLAY_MS) openNow();
   }, [accessToken, openNow]);
 
@@ -175,7 +201,12 @@ export function FirstTimeSetup() {
     set(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
 
   const finish = () => {
-    try { localStorage.setItem(FRAMEWORKS_KEY, JSON.stringify(selected)); } catch { /* ignore */ }
+    const config = { selected, denyCats, dpi, sanctioned, tenantId, discovered, ids, av };
+    try {
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+      localStorage.setItem(FRAMEWORKS_KEY, JSON.stringify(selected));
+      localStorage.setItem(COMPLETED_KEY, new Date().toISOString());
+    } catch { /* ignore */ }
     setOpen(false);
   };
 
@@ -273,10 +304,16 @@ export function FirstTimeSetup() {
                 Let&apos;s stand up your ApexAegis posture — governance frameworks, content controls, inspection depth,
                 sanctioned apps &amp; AI, private access, and your IDS/IPS/WAF + AV profiles. The console configures itself around your choices.
               </p>
+              {completedAt && (
+                <div className="mt-5 mx-auto max-w-md px-4 py-2.5 rounded-xl text-[12.5px] flex items-center gap-2 justify-center"
+                  style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', color: '#86efac' }}>
+                  <Check size={14} /> Setup already completed on {new Date(completedAt).toLocaleDateString()} — review your posture or close.
+                </div>
+              )}
               <button onClick={() => setStep(STEP_FRAMEWORKS)}
                 className="mt-8 inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white transition-all"
                 style={{ background: `linear-gradient(90deg,${ACCENT},#8b6dff)` }}>
-                Get started <ArrowRight size={16} />
+                {completedAt ? 'Review posture' : 'Get started'} <ArrowRight size={16} />
               </button>
             </div>
           )}

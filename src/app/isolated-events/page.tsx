@@ -18,7 +18,22 @@ import {
   ListChecks,
   ShieldCheck,
   ArrowRight,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
+
+// Animated response sequence shown when a playbook runs, before the report reveals.
+const PLAYBOOK_STEPS: { icon: ElementType; label: string }[] = [
+  { icon: Cpu, label: 'Collecting volatile memory & process tree' },
+  { icon: ShieldOff, label: 'Isolating endpoint NIC — network quarantine' },
+  { icon: X, label: 'Terminating malicious processes' },
+  { icon: Network, label: 'Blocking C2 domains & revoking session tokens' },
+  { icon: Fingerprint, label: 'Capturing forensic disk & memory snapshot' },
+  { icon: Crosshair, label: 'Correlating activity to MITRE ATT&CK' },
+  { icon: Wrench, label: 'Rolling back changes to pre-compromise state' },
+  { icon: ShieldCheck, label: 'Endpoint restored & verified clean' },
+  { icon: FileText, label: 'Compiling forensic report' },
+];
 
 // ---------------------------------------------------------------------------
 // Isolated Events — contained/quarantined endpoints + forensic playbook report.
@@ -404,6 +419,8 @@ export default function IsolatedEventsPage() {
   const [rows, setRows] = useState<IsolatedEndpoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [stage, setStage] = useState<'running' | 'done'>('running');
+  const [stepIdx, setStepIdx] = useState(0);
 
   // Timestamps are computed client-side (Date.now) to avoid SSR/CSR drift.
   const load = useCallback(() => {
@@ -424,6 +441,14 @@ export default function IsolatedEventsPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [openId]);
+
+  // Animated response sequence → advance through the steps, then reveal the report.
+  useEffect(() => {
+    if (!openId || stage !== 'running') return;
+    if (stepIdx >= PLAYBOOK_STEPS.length) { const t = setTimeout(() => setStage('done'), 450); return () => clearTimeout(t); }
+    const t = setTimeout(() => setStepIdx((i) => i + 1), 500);
+    return () => clearTimeout(t);
+  }, [openId, stage, stepIdx]);
 
   const openRow = rows.find((r) => r.id === openId) || null;
   const activeCount = rows.filter((r) => r.status !== 'Released').length;
@@ -514,7 +539,7 @@ export default function IsolatedEventsPage() {
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <button
-                      onClick={() => setOpenId(r.id)}
+                      onClick={() => { setStepIdx(0); setStage('running'); setOpenId(r.id); }}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-800/60 hover:bg-gray-800 border border-gray-700 rounded-lg text-xs"
                     >
                       <Play size={12} /> Run playbook
@@ -537,6 +562,28 @@ export default function IsolatedEventsPage() {
             className="relative w-full max-w-3xl my-8 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Animated response playbook — covers the card until the report is ready */}
+            {stage === 'running' && (
+              <div className="absolute inset-0 z-30 bg-gray-900 rounded-xl flex flex-col items-center justify-start px-6 pt-20 pb-12 min-h-[60vh]">
+                <div className="w-full max-w-md">
+                  <h2 className="text-lg font-bold flex items-center gap-2 mb-1">
+                    <ShieldOff size={18} className="text-cyan-400" /> Running response playbook
+                  </h2>
+                  <p className="text-xs text-gray-400 mb-6"><span className="font-mono text-gray-300">{openRow.device}</span> — contain · eradicate · restore</p>
+                  <div className="space-y-2.5">
+                    {PLAYBOOK_STEPS.map((s, i) => {
+                      const done = i < stepIdx; const active = i === stepIdx; const Icon = s.icon;
+                      return (
+                        <div key={i} className={clsx('flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-colors', done ? 'border-green-800 bg-green-900/10' : active ? 'border-cyan-800 bg-cyan-900/10' : 'border-gray-800 bg-gray-900/40')}>
+                          {done ? <CheckCircle2 size={16} className="text-green-400 shrink-0" /> : active ? <Loader2 size={16} className="text-cyan-400 animate-spin shrink-0" /> : <Icon size={16} className="text-gray-600 shrink-0" />}
+                          <span className={clsx('text-sm', done ? 'text-green-300' : active ? 'text-gray-200' : 'text-gray-600')}>{s.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Modal header */}
             <div className="sticky top-0 z-10 bg-gray-900 border-b border-gray-800 px-5 py-4 flex items-start justify-between gap-3">
               <div>
