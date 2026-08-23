@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Workflow, CheckCircle2, XCircle, ArrowRight,
   RefreshCw, Download, Play, Pause, Settings, Zap, Bell, FileText,
@@ -213,6 +213,14 @@ export default function ITSMAutomationPage() {
   const [activeSection, setActiveSection] = useState<'signals' | 'controls' | 'pipelines' | 'integrations'>('signals');
   const [itsmIntegrations, setItsmIntegrations] = useState(demoIntegrations);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+  const [coachReqs, setCoachReqs] = useState<{ ticket: string; domain: string; score: number; priority: string; status: string; at: number }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => fetch('/api/demo-itsm', { cache: 'no-store' }).then(r => r.json()).then(d => { if (alive && Array.isArray(d.requests)) setCoachReqs(d.requests); }).catch(() => {});
+    load();
+    const t = setInterval(load, 20000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
 
   const toggleKeyVisibility = (platform: string) => {
     setVisibleKeys(prev => {
@@ -263,6 +271,42 @@ export default function ITSMAutomationPage() {
           </button>
         </div>
       </div>
+
+      {/* DNS-PEP access requests raised from the block coach page (live from KV) */}
+      {coachReqs.length > 0 && (
+        <div className="bg-gray-900/40 border border-gray-800 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2 flex-wrap">
+            <Bell size={16} className="text-amber-400" />
+            <span className="text-sm font-semibold">DNS-PEP Access Requests</span>
+            <span className="text-[11px] text-gray-500">raised from the block coach page — auto-triaged, awaiting approval</span>
+            <span className="ml-auto text-[11px] text-gray-500">{coachReqs.length} pending</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                <th className="text-left font-medium px-4 py-2">Ticket</th>
+                <th className="text-left font-medium px-4 py-2">Domain</th>
+                <th className="text-center font-medium px-4 py-2">Risk</th>
+                <th className="text-left font-medium px-4 py-2">Priority</th>
+                <th className="text-left font-medium px-4 py-2">Status</th>
+                <th className="text-left font-medium px-4 py-2">Raised</th>
+              </tr></thead>
+              <tbody>
+                {coachReqs.map((r) => (
+                  <tr key={r.ticket} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                    <td className="px-4 py-2.5 font-mono text-[12px] text-gray-200">{r.ticket}</td>
+                    <td className="px-4 py-2.5 font-mono text-[12px] text-gray-300">{r.domain}</td>
+                    <td className="px-4 py-2.5 text-center font-mono font-bold text-red-400">{r.score}</td>
+                    <td className="px-4 py-2.5"><span className={`text-[11px] px-1.5 py-0.5 rounded border capitalize ${r.priority === 'high' ? 'text-red-400 border-red-800 bg-red-900/20' : r.priority === 'medium' ? 'text-amber-400 border-amber-800 bg-amber-900/20' : 'text-gray-400 border-gray-700 bg-gray-800/40'}`}>{r.priority}</span></td>
+                    <td className="px-4 py-2.5"><span className="text-[11px] px-1.5 py-0.5 rounded border text-amber-400 border-amber-800 bg-amber-900/20">Pending approval</span></td>
+                    <td className="px-4 py-2.5 text-gray-400 text-[12px]">{new Date(r.at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Overview cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

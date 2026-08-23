@@ -120,7 +120,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Discovery',
     items: [
-      { href: '/ghosted-apps', icon: Ghost, label: 'Ghosted Apps & Services', featureId: 'ghosted-apps' },
+      { href: '/ghosted-apps', icon: Ghost, label: 'App Events (Shadow IT)', featureId: 'ghosted-apps' },
       { href: '/discovery/private-apps', icon: Compass, label: 'Private App Discovery', premium: true },
     ],
   },
