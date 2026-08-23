@@ -265,7 +265,7 @@ export function FirstTimeSetup() {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       style={{ background: 'rgba(6,4,20,0.72)', backdropFilter: 'blur(6px)' }}>
-      <div className="w-full max-w-2xl rounded-2xl border overflow-hidden shadow-2xl"
+      <div className="w-full max-w-2xl rounded-2xl border overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
         style={{ background: 'linear-gradient(180deg,#141033,#0e0a24)', borderColor: 'rgba(109,74,255,0.25)' }}>
 
         {/* Header */}
@@ -291,7 +291,7 @@ export function FirstTimeSetup() {
           </div>
         </div>
 
-        <div className="px-6 py-6 min-h-[360px]">
+        <div className="px-6 py-6 overflow-y-auto flex-1">
           {/* ── 0 · Welcome ── */}
           {step === STEP_WELCOME && (
             <div className="text-center py-6">
