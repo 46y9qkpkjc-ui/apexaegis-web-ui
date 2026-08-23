@@ -1,10 +1,9 @@
 'use client';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Server, Activity, CheckCircle, XCircle, AlertTriangle, RefreshCw, MapPin,
-  Power, X, Ban, Globe, Network, Route, Shield, Zap, Radio, Waypoints,
-  GitBranch, Lock, Eye, ChevronRight, BarChart3, ArrowLeftRight,
-  Search,
+  Power, X, Ban, Globe, Network, Route, Shield, Zap,
+  GitBranch, Lock, ChevronRight, BarChart3, ArrowLeftRight,
 } from 'lucide-react';
 import { fetchGateways, type ApiGateway } from '@/lib/gateway-api';
 
@@ -74,31 +73,7 @@ function fromApi(gw: ApiGateway): GatewayNode {
   };
 }
 
-/* ─── Singtel Backbone — 428 PoPs in 362 cities ────────────── */
-interface SingtelPoP {
-  city: string;
-  country: string;
-  pops: number;
-  tier: 'core' | 'edge' | 'access';
-  scionEnabled: boolean;
-  mplsRingId: string;
-  latencyToCore: number; // ms
-  capacity: string;
-  peerings: number;
-}
-
-interface SingtelRegion {
-  name: string;
-  code: string;
-  cities: number;
-  pops: number;
-  totalCapacity: string;
-  scionPaths: number;
-  mplsRings: number;
-  topPops: SingtelPoP[];
-}
-
-interface ScionPath {
+interface ApexphalanxPath {
   id: string;
   name: string;
   hops: string[];
@@ -112,120 +87,55 @@ interface ScionPath {
   trustScore: number;
 }
 
-const singtelRegions: SingtelRegion[] = [
-  {
-    name: 'Asia Pacific', code: 'APAC', cities: 128, pops: 156, totalCapacity: '48 Tbps',
-    scionPaths: 312, mplsRings: 14,
-    topPops: [
-      { city: 'Singapore', country: 'SG', pops: 8, tier: 'core', scionEnabled: true, mplsRingId: 'APAC-CORE-1', latencyToCore: 0, capacity: '4.8 Tbps', peerings: 142 },
-      { city: 'Tokyo', country: 'JP', pops: 6, tier: 'core', scionEnabled: true, mplsRingId: 'APAC-CORE-2', latencyToCore: 52, capacity: '3.2 Tbps', peerings: 98 },
-      { city: 'Hong Kong', country: 'HK', pops: 5, tier: 'core', scionEnabled: true, mplsRingId: 'APAC-CORE-3', latencyToCore: 28, capacity: '2.8 Tbps', peerings: 87 },
-      { city: 'Sydney', country: 'AU', pops: 4, tier: 'core', scionEnabled: true, mplsRingId: 'APAC-CORE-4', latencyToCore: 96, capacity: '2.4 Tbps', peerings: 64 },
-      { city: 'Mumbai', country: 'IN', pops: 4, tier: 'edge', scionEnabled: true, mplsRingId: 'APAC-EDGE-1', latencyToCore: 68, capacity: '1.6 Tbps', peerings: 52 },
-      { city: 'Seoul', country: 'KR', pops: 3, tier: 'edge', scionEnabled: true, mplsRingId: 'APAC-EDGE-2', latencyToCore: 45, capacity: '1.2 Tbps', peerings: 41 },
-    ],
-  },
-  {
-    name: 'North America', code: 'NA', cities: 82, pops: 98, totalCapacity: '38 Tbps',
-    scionPaths: 224, mplsRings: 11,
-    topPops: [
-      { city: 'Ashburn', country: 'US', pops: 6, tier: 'core', scionEnabled: true, mplsRingId: 'NA-CORE-1', latencyToCore: 180, capacity: '4.2 Tbps', peerings: 128 },
-      { city: 'San Jose', country: 'US', pops: 5, tier: 'core', scionEnabled: true, mplsRingId: 'NA-CORE-2', latencyToCore: 162, capacity: '3.6 Tbps', peerings: 104 },
-      { city: 'Chicago', country: 'US', pops: 4, tier: 'core', scionEnabled: true, mplsRingId: 'NA-CORE-3', latencyToCore: 195, capacity: '2.8 Tbps', peerings: 76 },
-      { city: 'Dallas', country: 'US', pops: 3, tier: 'edge', scionEnabled: true, mplsRingId: 'NA-EDGE-1', latencyToCore: 210, capacity: '1.4 Tbps', peerings: 48 },
-      { city: 'Toronto', country: 'CA', pops: 3, tier: 'edge', scionEnabled: true, mplsRingId: 'NA-EDGE-2', latencyToCore: 200, capacity: '1.2 Tbps', peerings: 38 },
-    ],
-  },
-  {
-    name: 'Europe', code: 'EU', cities: 94, pops: 108, totalCapacity: '42 Tbps',
-    scionPaths: 268, mplsRings: 12,
-    topPops: [
-      { city: 'Frankfurt', country: 'DE', pops: 7, tier: 'core', scionEnabled: true, mplsRingId: 'EU-CORE-1', latencyToCore: 148, capacity: '4.4 Tbps', peerings: 136 },
-      { city: 'London', country: 'GB', pops: 6, tier: 'core', scionEnabled: true, mplsRingId: 'EU-CORE-2', latencyToCore: 164, capacity: '3.8 Tbps', peerings: 118 },
-      { city: 'Amsterdam', country: 'NL', pops: 5, tier: 'core', scionEnabled: true, mplsRingId: 'EU-CORE-3', latencyToCore: 152, capacity: '3.2 Tbps', peerings: 94 },
-      { city: 'Paris', country: 'FR', pops: 4, tier: 'edge', scionEnabled: true, mplsRingId: 'EU-EDGE-1', latencyToCore: 158, capacity: '2.1 Tbps', peerings: 72 },
-      { city: 'Zurich', country: 'CH', pops: 3, tier: 'edge', scionEnabled: true, mplsRingId: 'EU-EDGE-2', latencyToCore: 150, capacity: '1.8 Tbps', peerings: 56 },
-    ],
-  },
-  {
-    name: 'Middle East & Africa', code: 'MEA', cities: 32, pops: 38, totalCapacity: '12 Tbps',
-    scionPaths: 86, mplsRings: 5,
-    topPops: [
-      { city: 'Dubai', country: 'AE', pops: 4, tier: 'core', scionEnabled: true, mplsRingId: 'MEA-CORE-1', latencyToCore: 108, capacity: '2.4 Tbps', peerings: 48 },
-      { city: 'Johannesburg', country: 'ZA', pops: 3, tier: 'edge', scionEnabled: true, mplsRingId: 'MEA-EDGE-1', latencyToCore: 186, capacity: '1.2 Tbps', peerings: 28 },
-      { city: 'Nairobi', country: 'KE', pops: 2, tier: 'access', scionEnabled: false, mplsRingId: 'MEA-ACC-1', latencyToCore: 210, capacity: '400 Gbps', peerings: 12 },
-    ],
-  },
-  {
-    name: 'Latin America', code: 'LATAM', cities: 26, pops: 28, totalCapacity: '8 Tbps',
-    scionPaths: 54, mplsRings: 4,
-    topPops: [
-      { city: 'São Paulo', country: 'BR', pops: 4, tier: 'core', scionEnabled: true, mplsRingId: 'LATAM-CORE-1', latencyToCore: 284, capacity: '2.8 Tbps', peerings: 52 },
-      { city: 'Mexico City', country: 'MX', pops: 3, tier: 'edge', scionEnabled: true, mplsRingId: 'LATAM-EDGE-1', latencyToCore: 230, capacity: '1.2 Tbps', peerings: 34 },
-      { city: 'Buenos Aires', country: 'AR', pops: 2, tier: 'edge', scionEnabled: true, mplsRingId: 'LATAM-EDGE-2', latencyToCore: 310, capacity: '800 Gbps', peerings: 22 },
-    ],
-  },
-];
-
-const scionPaths: ScionPath[] = [
+const apexphalanxPaths: ApexphalanxPath[] = [
   {
     id: 'sp-1', name: 'APAC Express → NA West',
     hops: ['Singapore (SG)', 'Tokyo (JP)', 'San Jose (US)'],
-    latency: 142, bandwidth: '400 Gbps', isolationDomain: 'ISD-1 (Singtel Sovereign)',
-    status: 'active', mplsLabel: 100201, pathType: 'primary', encryption: 'AES-256-GCM + SCION DRKey', trustScore: 99,
+    latency: 142, bandwidth: '400 Gbps', isolationDomain: 'ISD-1 (ApexAegis Sovereign)',
+    status: 'active', mplsLabel: 100201, pathType: 'primary', encryption: 'AES-256-GCM + Apexphalanx DRKey', trustScore: 99,
   },
   {
     id: 'sp-2', name: 'APAC Express → EU Core',
     hops: ['Singapore (SG)', 'Mumbai (IN)', 'Dubai (AE)', 'Frankfurt (DE)'],
-    latency: 148, bandwidth: '400 Gbps', isolationDomain: 'ISD-1 (Singtel Sovereign)',
-    status: 'active', mplsLabel: 100202, pathType: 'primary', encryption: 'AES-256-GCM + SCION DRKey', trustScore: 98,
+    latency: 148, bandwidth: '400 Gbps', isolationDomain: 'ISD-1 (ApexAegis Sovereign)',
+    status: 'active', mplsLabel: 100202, pathType: 'primary', encryption: 'AES-256-GCM + Apexphalanx DRKey', trustScore: 98,
   },
   {
     id: 'sp-3', name: 'Trans-Pacific Backup',
     hops: ['Singapore (SG)', 'Sydney (AU)', 'Auckland (NZ)', 'San Jose (US)'],
     latency: 186, bandwidth: '200 Gbps', isolationDomain: 'ISD-2 (Pacific Ring)',
-    status: 'standby', mplsLabel: 100301, pathType: 'backup', encryption: 'AES-256-GCM + SCION DRKey', trustScore: 97,
+    status: 'standby', mplsLabel: 100301, pathType: 'backup', encryption: 'AES-256-GCM + Apexphalanx DRKey', trustScore: 97,
   },
   {
     id: 'sp-4', name: 'EU ↔ NA Express',
     hops: ['London (GB)', 'Ashburn (US)', 'Chicago (US)'],
     latency: 72, bandwidth: '800 Gbps', isolationDomain: 'ISD-3 (Atlantic Secure)',
-    status: 'active', mplsLabel: 100401, pathType: 'primary', encryption: 'AES-256-GCM + SCION DRKey', trustScore: 99,
+    status: 'active', mplsLabel: 100401, pathType: 'primary', encryption: 'AES-256-GCM + Apexphalanx DRKey', trustScore: 99,
   },
   {
     id: 'sp-5', name: 'Sovereign APAC Ring',
     hops: ['Singapore (SG)', 'Hong Kong (HK)', 'Tokyo (JP)', 'Seoul (KR)', 'Singapore (SG)'],
-    latency: 94, bandwidth: '1.2 Tbps', isolationDomain: 'ISD-1 (Singtel Sovereign)',
+    latency: 94, bandwidth: '1.2 Tbps', isolationDomain: 'ISD-1 (ApexAegis Sovereign)',
     status: 'active', mplsLabel: 100501, pathType: 'primary', encryption: 'AES-256-GCM + Post-Quantum CRYSTALS-Kyber', trustScore: 100,
   },
   {
     id: 'sp-6', name: 'MEA → APAC Direct',
     hops: ['Dubai (AE)', 'Mumbai (IN)', 'Singapore (SG)'],
     latency: 108, bandwidth: '200 Gbps', isolationDomain: 'ISD-4 (Gulf-Asia Corridor)',
-    status: 'active', mplsLabel: 100601, pathType: 'primary', encryption: 'AES-256-GCM + SCION DRKey', trustScore: 96,
+    status: 'active', mplsLabel: 100601, pathType: 'primary', encryption: 'AES-256-GCM + Apexphalanx DRKey', trustScore: 96,
   },
   {
     id: 'sp-7', name: 'LATAM → NA Failover',
     hops: ['São Paulo (BR)', 'Miami (US)', 'Ashburn (US)'],
     latency: 134, bandwidth: '100 Gbps', isolationDomain: 'ISD-5 (Americas)',
-    status: 'failover', mplsLabel: 100701, pathType: 'on-demand', encryption: 'AES-256-GCM + SCION DRKey', trustScore: 94,
+    status: 'failover', mplsLabel: 100701, pathType: 'on-demand', encryption: 'AES-256-GCM + Apexphalanx DRKey', trustScore: 94,
   },
 ];
-
-const TOTAL_POPS = 428;
-const TOTAL_CITIES = 362;
-const TOTAL_CAPACITY = '148 Tbps';
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; label: string; bg: string }> = {
   healthy: { icon: CheckCircle, color: 'text-green-400', label: 'Healthy', bg: 'bg-green-900/40 border-green-800' },
   degraded: { icon: AlertTriangle, color: 'text-yellow-400', label: 'Degraded', bg: 'bg-yellow-900/40 border-yellow-800' },
   offline: { icon: XCircle, color: 'text-red-400', label: 'Offline', bg: 'bg-red-900/40 border-red-800' },
-};
-
-const tierColors: Record<string, string> = {
-  core: 'text-emerald-400 bg-emerald-900/30 border-emerald-800',
-  edge: 'text-blue-400 bg-blue-900/30 border-blue-800',
-  access: 'text-amber-400 bg-amber-900/30 border-amber-800',
 };
 
 const pathStatusColors: Record<string, { color: string; bg: string }> = {
@@ -333,7 +243,7 @@ function GatewayCard({ gw, onToggle }: { gw: GatewayNode; onToggle: () => void }
   );
 }
 
-type ActiveTab = 'gateways' | 'backbone' | 'scion';
+type ActiveTab = 'gateways' | 'apexphalanx';
 
 export default function GatewayNodesPage() {
   const [gateways, setGateways] = useState<GatewayNode[]>([]);
@@ -342,9 +252,7 @@ export default function GatewayNodesPage() {
   const [disableModal, setDisableModal] = useState<{ gwId: string; action: 'disable' | 'enable' } | null>(null);
   const [disableReason, setDisableReason] = useState('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('gateways');
-  const [expandedRegion, setExpandedRegion] = useState<string | null>(null);
-  const [selectedPath, setSelectedPath] = useState<ScionPath | null>(null);
-  const [backboneSearch, setBackboneSearch] = useState('');
+  const [selectedPath, setSelectedPath] = useState<ApexphalanxPath | null>(null);
 
   const loadGateways = useCallback(async () => {
     try {
@@ -380,18 +288,7 @@ export default function GatewayNodesPage() {
   const healthyCount = gateways.filter(g => g.status === 'healthy').length;
   const totalTunnels = gateways.reduce((sum, g) => sum + g.tunnels, 0);
   const disabledCount = gateways.filter(g => g.adminDisabled).length;
-  const activeScionPaths = scionPaths.filter(p => p.status === 'active').length;
-
-  const filteredRegions = useMemo(() => {
-    if (!backboneSearch) return singtelRegions;
-    const q = backboneSearch.toLowerCase();
-    return singtelRegions.map(r => {
-      const filteredPops = r.topPops.filter(p => p.city.toLowerCase().includes(q) || p.country.toLowerCase().includes(q));
-      if (filteredPops.length > 0) return { ...r, topPops: filteredPops };
-      if (r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q)) return r;
-      return null;
-    }).filter(Boolean) as SingtelRegion[];
-  }, [backboneSearch]);
+  const activeApexphalanxPaths = apexphalanxPaths.filter(p => p.status === 'active').length;
 
   return (
     <div className="space-y-6">
@@ -405,10 +302,9 @@ export default function GatewayNodesPage() {
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2">
               NextGenNodes
-              <span className="text-xs font-normal px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 border border-emerald-800">Singtel Backbone</span>
             </h1>
             <p className="text-sm text-gray-500">
-              {TOTAL_POPS} Points-of-Presence · {TOTAL_CITIES} Cities · SCION over MPLS · {TOTAL_CAPACITY} Global Capacity
+              Gateway infrastructure for ApexAegis managed security
             </p>
           </div>
         </div>
@@ -425,8 +321,7 @@ export default function GatewayNodesPage() {
       <div className="flex items-center gap-1 p-1 bg-gray-800/50 rounded-lg border border-gray-700/50 w-fit overflow-x-auto">
         {[
           { key: 'gateways' as ActiveTab, label: 'Gateway Nodes', icon: Server, count: gateways.length },
-          { key: 'backbone' as ActiveTab, label: 'Singtel Backbone', icon: Network, count: TOTAL_POPS },
-          { key: 'scion' as ActiveTab, label: 'SCION Paths', icon: Route, count: scionPaths.length },
+          { key: 'apexphalanx' as ActiveTab, label: 'Apexphalanx Paths', icon: Route, count: apexphalanxPaths.length },
         ].map(tab => (
           <button
             key={tab.key}
@@ -461,7 +356,7 @@ export default function GatewayNodesPage() {
           <Activity size={14} className="inline mr-1" /> Active Tunnels: {totalTunnels}
         </span>
         <span className="px-3 py-1.5 rounded-lg bg-emerald-900/20 border border-emerald-800/30 text-sm text-emerald-400">
-          <Network size={14} className="inline mr-1" /> SCION Active: {activeScionPaths}/{scionPaths.length}
+          <Network size={14} className="inline mr-1" /> Apexphalanx Active: {activeApexphalanxPaths}/{apexphalanxPaths.length}
         </span>
         {disabledCount > 0 && (
           <span className="px-3 py-1.5 rounded-lg bg-red-900/20 border border-red-800/30 text-sm text-red-400">
@@ -509,155 +404,17 @@ export default function GatewayNodesPage() {
         </>/* end gateways tab */
       )}
 
-      {/* ═══════════════ TAB 2: SINGTEL BACKBONE ═══════════════ */}
-      {activeTab === 'backbone' && (
-        <>
-          {/* Global backbone KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {[
-              { label: 'Points-of-Presence', value: TOTAL_POPS, icon: Radio, color: 'text-emerald-400' },
-              { label: 'Cities', value: TOTAL_CITIES, icon: MapPin, color: 'text-blue-400' },
-              { label: 'MPLS Rings', value: singtelRegions.reduce((s, r) => s + r.mplsRings, 0), icon: GitBranch, color: 'text-purple-400' },
-              { label: 'SCION Paths', value: singtelRegions.reduce((s, r) => s + r.scionPaths, 0), icon: Route, color: 'text-amber-400' },
-              { label: 'Global Capacity', value: TOTAL_CAPACITY, icon: Zap, color: 'text-cyan-400' },
-              { label: 'Regions', value: singtelRegions.length, icon: Globe, color: 'text-pink-400' },
-            ].map(kpi => (
-              <div key={kpi.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <kpi.icon size={14} className={kpi.color} />
-                  <span className="text-xs text-gray-500">{kpi.label}</span>
-                </div>
-                <span className="text-lg font-semibold">{kpi.value}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* SCION over MPLS feature banner */}
-          <div className="bg-gradient-to-r from-emerald-900/20 via-blue-900/20 to-purple-900/20 border border-emerald-800/30 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-emerald-900/40 rounded-lg"><Waypoints size={20} className="text-emerald-400" /></div>
-              <div>
-                <h3 className="text-sm font-semibold">SCION over MPLS Backbone</h3>
-                <p className="text-xs text-gray-400">Path-aware networking with cryptographic sovereignty on Singtel&apos;s global MPLS infrastructure</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              <div className="flex items-center gap-2"><Lock size={12} className="text-emerald-400" /> <span className="text-gray-300">Isolation Domains (ISD) — sovereign trust boundaries</span></div>
-              <div className="flex items-center gap-2"><Route size={12} className="text-blue-400" /> <span className="text-gray-300">Multi-path selection — latency, geofence, compliance</span></div>
-              <div className="flex items-center gap-2"><Shield size={12} className="text-purple-400" /> <span className="text-gray-300">DRKey — per-flow cryptographic authentication</span></div>
-              <div className="flex items-center gap-2"><Eye size={12} className="text-amber-400" /> <span className="text-gray-300">Path transparency — no hidden hops or BGP hijacks</span></div>
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="relative w-80">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              value={backboneSearch}
-              onChange={e => setBackboneSearch(e.target.value)}
-              placeholder="Search cities, countries, regions..."
-              className="w-full pl-9 pr-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-emerald-500/50"
-            />
-          </div>
-
-          {/* Region cards */}
-          <div className="space-y-4">
-            {filteredRegions.map(region => (
-              <div key={region.code} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setExpandedRegion(expandedRegion === region.code ? null : region.code)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-800/30 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <Globe size={18} className="text-emerald-400" />
-                    <div>
-                      <h3 className="text-sm font-semibold">{region.name} <span className="text-gray-500 font-normal">({region.code})</span></h3>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                        <span>{region.cities} cities</span>
-                        <span>·</span>
-                        <span>{region.pops} PoPs</span>
-                        <span>·</span>
-                        <span>{region.totalCapacity}</span>
-                        <span>·</span>
-                        <span>{region.mplsRings} MPLS rings</span>
-                        <span>·</span>
-                        <span>{region.scionPaths} SCION paths</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {/* Region capacity bar */}
-                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"
-                        style={{ width: `${(region.pops / TOTAL_POPS) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-400 w-10 text-right">{((region.pops / TOTAL_POPS) * 100).toFixed(0)}%</span>
-                    <ChevronRight size={16} className={`text-gray-500 transition-transform ${expandedRegion === region.code ? 'rotate-90' : ''}`} />
-                  </div>
-                </button>
-
-                {expandedRegion === region.code && (
-                  <div className="border-t border-gray-800 p-4">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-xs text-gray-500 border-b border-gray-800">
-                          <th className="text-left py-2 font-medium">City</th>
-                          <th className="text-left py-2 font-medium">Country</th>
-                          <th className="text-left py-2 font-medium">PoPs</th>
-                          <th className="text-left py-2 font-medium">Tier</th>
-                          <th className="text-left py-2 font-medium">MPLS Ring</th>
-                          <th className="text-left py-2 font-medium">Capacity</th>
-                          <th className="text-left py-2 font-medium">Latency to Core</th>
-                          <th className="text-left py-2 font-medium">Peerings</th>
-                          <th className="text-left py-2 font-medium">SCION</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {region.topPops.map(pop => (
-                          <tr key={pop.city} className="border-b border-gray-800/50 hover:bg-gray-800/20">
-                            <td className="py-2.5 font-medium">{pop.city}</td>
-                            <td className="py-2.5 text-gray-400">{pop.country}</td>
-                            <td className="py-2.5">{pop.pops}</td>
-                            <td className="py-2.5">
-                              <span className={`px-2 py-0.5 rounded text-xs border ${tierColors[pop.tier]}`}>
-                                {pop.tier}
-                              </span>
-                            </td>
-                            <td className="py-2.5 font-mono text-xs text-gray-400">{pop.mplsRingId}</td>
-                            <td className="py-2.5 text-gray-300">{pop.capacity}</td>
-                            <td className="py-2.5 text-gray-300">{pop.latencyToCore} ms</td>
-                            <td className="py-2.5 text-gray-300">{pop.peerings}</td>
-                            <td className="py-2.5">
-                              {pop.scionEnabled
-                                ? <span className="text-emerald-400 flex items-center gap-1"><CheckCircle size={12} /> Enabled</span>
-                                : <span className="text-gray-500 flex items-center gap-1"><XCircle size={12} /> Pending</span>
-                              }
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ═══════════════ TAB 3: SCION PATHS ═══════════════ */}
-      {activeTab === 'scion' && (
+      {/* ═══════════════ TAB 2: APEXPHALANX PATHS ═══════════════ */}
+      {activeTab === 'apexphalanx' && (
         <>
           {/* SCION overview KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {[
-              { label: 'Active Paths', value: scionPaths.filter(p => p.status === 'active').length, icon: Route, color: 'text-green-400' },
-              { label: 'Standby Paths', value: scionPaths.filter(p => p.status === 'standby').length, icon: Route, color: 'text-amber-400' },
-              { label: 'Failover Paths', value: scionPaths.filter(p => p.status === 'failover').length, icon: Route, color: 'text-purple-400' },
-              { label: 'Isolation Domains', value: new Set(scionPaths.map(p => p.isolationDomain)).size, icon: Lock, color: 'text-cyan-400' },
-              { label: 'Avg Trust Score', value: (scionPaths.reduce((s, p) => s + p.trustScore, 0) / scionPaths.length).toFixed(1) + '%', icon: Shield, color: 'text-emerald-400' },
+              { label: 'Active Paths', value: apexphalanxPaths.filter(p => p.status === 'active').length, icon: Route, color: 'text-green-400' },
+              { label: 'Standby Paths', value: apexphalanxPaths.filter(p => p.status === 'standby').length, icon: Route, color: 'text-amber-400' },
+              { label: 'Failover Paths', value: apexphalanxPaths.filter(p => p.status === 'failover').length, icon: Route, color: 'text-purple-400' },
+              { label: 'Isolation Domains', value: new Set(apexphalanxPaths.map(p => p.isolationDomain)).size, icon: Lock, color: 'text-cyan-400' },
+              { label: 'Avg Trust Score', value: (apexphalanxPaths.reduce((s, p) => s + p.trustScore, 0) / apexphalanxPaths.length).toFixed(1) + '%', icon: Shield, color: 'text-emerald-400' },
             ].map(kpi => (
               <div key={kpi.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -671,7 +428,7 @@ export default function GatewayNodesPage() {
 
           {/* Path cards */}
           <div className="space-y-3">
-            {scionPaths.map(path => {
+            {apexphalanxPaths.map(path => {
               const stc = pathStatusColors[path.status];
               return (
                 <div

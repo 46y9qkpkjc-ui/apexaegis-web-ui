@@ -97,7 +97,8 @@ const navGroups = [
     label: 'Infrastructure',
     items: [
       { href: '/gateways', label: 'Gateway Nodes' },
-      { href: '/gateways/scion-partners', label: 'SCION Partner Gateway' },
+      { href: '/gateways/registration', label: 'Gateway Registration' },
+      { href: '/gateways/apexphalanx-partners', label: 'Apexphalanx Partner Gateway' },
       { href: '/infrastructure/sdn', label: 'SDN Switches' },
       { href: '/infrastructure/port-config', label: 'Port Configuration' },
       { href: '/infrastructure/dot1x', label: '802.1X Auth Server' },
@@ -154,7 +155,8 @@ const routePages = new Set([
   '/compliance/itsm-automation',
   '/audit',
   '/gateways',
-  '/gateways/scion-partners',
+  '/gateways/registration',
+  '/gateways/apexphalanx-partners',
   '/infrastructure/sdn',
   '/infrastructure/port-config',
   '/infrastructure/dot1x',
@@ -175,8 +177,8 @@ describe('Navigation — No Broken Links', () => {
     expect(navGroups).toHaveLength(11);
   });
 
-  it('has 50 total navigation items', () => {
-    expect(allItems).toHaveLength(50);
+  it('has 51 total navigation items', () => {
+    expect(allItems).toHaveLength(51);
   });
 
   it('all hrefs are unique (no duplicates)', () => {
@@ -300,7 +302,8 @@ describe('Navigation — Group Structure', () => {
     const group = navGroups.find(g => g.label === 'Infrastructure')!;
     const hrefs = group.items.map(i => i.href);
     expect(hrefs).toContain('/gateways');
-    expect(hrefs).toContain('/gateways/scion-partners');
+    expect(hrefs).toContain('/gateways/registration');
+    expect(hrefs).toContain('/gateways/apexphalanx-partners');
     expect(hrefs).toContain('/infrastructure/sdn');
     expect(hrefs).toContain('/infrastructure/port-config');
     expect(hrefs).toContain('/infrastructure/dot1x');

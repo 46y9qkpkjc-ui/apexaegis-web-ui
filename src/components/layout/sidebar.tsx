@@ -146,6 +146,7 @@ const navGroups: NavGroup[] = [
     label: 'Infrastructure',
     items: [
       { href: '/gateways', icon: Server, label: 'Gateway Nodes' },
+      { href: '/gateways/registration', icon: Key, label: 'Gateway Registration' },
       { href: '/admin/pep-licensing', icon: Router, label: 'PEP Licensing' },
       { href: '/certificates', icon: Lock, label: 'CA Certificates' },
       { href: '/migration', icon: ArrowDownToLine, label: 'Policy Migration' },
@@ -169,7 +170,7 @@ const hrefToSlug: Record<string, string> = {
   '/security/test-my-defence': 'security-checkup', '/security/mitre-attack': 'apt-simulation', '/security/security-preview': 'security-preview',
   '/security/attack-path': 'attack-path-analysis', '/security/ssl-scan': 'ssl-scanner',
   '/compliance': 'compliance-report', '/compliance/certifications': 'certifications', '/compliance/itsm-automation': 'itsm-automation',
-  '/gateways': 'gateways', '/certificates': 'certificates', '/migration': 'policy-migration', '/settings': 'settings',
+  '/gateways': 'gateways', '/gateways/registration': 'gateway-registration', '/certificates': 'certificates', '/migration': 'policy-migration', '/settings': 'settings',
 };
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {

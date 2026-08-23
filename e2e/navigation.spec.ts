@@ -112,7 +112,7 @@ const infraRoutes = [
   { path: '/infrastructure/dynamic-sgt', title: 'Dynamic SGT' },
   { path: '/infrastructure/guest-access', title: 'Guest Access' },
   { path: '/infrastructure/api-integrations', title: 'API Integrations' },
-  { path: '/gateways/scion-partners', title: 'SCION Partner Gateway' },
+  { path: '/gateways/apexphalanx-partners', title: 'Apexphalanx Partner Gateway' },
 ];
 
 test.describe('Infrastructure Navigation', () => {

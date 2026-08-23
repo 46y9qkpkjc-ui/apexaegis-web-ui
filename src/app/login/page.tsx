@@ -517,7 +517,7 @@ export default function LoginPage() {
             </span>
           </h2>
           <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
-            Zero-trust network access, SCION path-aware routing with AegisRoute™,
+            Zero-trust network access, Apexphalanx path-aware routing with AegisRoute™,
             advanced threat protection and unified security policy management —
             powered by the NextGenNodes global backbone.
           </p>
@@ -528,7 +528,7 @@ export default function LoginPage() {
             {[
               { label: 'Global PoPs', value: '428', color: 'text-cyan-400' },
               { label: 'Uptime SLA', value: '99.999%', color: 'text-green-400' },
-              { label: 'SCION ISDs', value: '12', color: 'text-amber-400' },
+              { label: 'Apexphalanx ISDs', value: '12', color: 'text-amber-400' },
             ].map(s => (
               <div key={s.label} className="p-3 bg-gray-800/30 backdrop-blur-sm border border-gray-700/40 rounded-xl text-center">
                 <div className={`text-lg font-bold ${s.color}`}>{s.value}</div>

@@ -17,7 +17,7 @@ interface PartnerOrg {
   peeringStatus: 'active' | 'negotiating' | 'pending-cert' | 'offline';
   trustLevel: 'mutual-tls' | 'pki-cross-signed' | 'drkey-established';
   encryptionSuite: string;
-  scionDevices: number;
+  apexphalanxDevices: number;
   throughputGbps: number;
   latencyMs: number;
   peeredSince: string | null;
@@ -43,56 +43,56 @@ const partners: PartnerOrg[] = [
   {
     id: 'p-1', name: 'Mastercard International', type: 'payment-network', logo: '💳',
     isdNumber: 100, peeringStatus: 'active', trustLevel: 'drkey-established',
-    encryptionSuite: 'CRYSTALS-Kyber-1024 + AES-256-GCM', scionDevices: 48,
-    throughputGbps: 40, latencyMs: 1.2, peeredSince: '2025-09-15', contactEmail: 'scion-peering@mastercard.com',
+    encryptionSuite: 'CRYSTALS-Kyber-1024 + AES-256-GCM', apexphalanxDevices: 48,
+    throughputGbps: 40, latencyMs: 1.2, peeredSince: '2025-09-15', contactEmail: 'apexphalanx-peering@mastercard.com',
     region: 'Global (US-EU-APAC)', complianceFrameworks: ['PCI-DSS 4.0', 'SOC 2 Type II', 'ISO 27001'],
   },
   {
     id: 'p-2', name: 'Visa Inc.', type: 'payment-network', logo: '💎',
     isdNumber: 101, peeringStatus: 'active', trustLevel: 'drkey-established',
-    encryptionSuite: 'CRYSTALS-Kyber-1024 + AES-256-GCM', scionDevices: 52,
+    encryptionSuite: 'CRYSTALS-Kyber-1024 + AES-256-GCM', apexphalanxDevices: 52,
     throughputGbps: 50, latencyMs: 0.9, peeredSince: '2025-10-01', contactEmail: 'network-ops@visa.com',
     region: 'Global (US-EU-APAC-LATAM)', complianceFrameworks: ['PCI-DSS 4.0', 'SOC 2 Type II', 'ISO 27001', 'NIST 800-53'],
   },
   {
     id: 'p-3', name: 'American Express', type: 'payment-network', logo: '🏛️',
     isdNumber: 102, peeringStatus: 'active', trustLevel: 'mutual-tls',
-    encryptionSuite: 'X25519 + ChaCha20-Poly1305', scionDevices: 24,
+    encryptionSuite: 'X25519 + ChaCha20-Poly1305', apexphalanxDevices: 24,
     throughputGbps: 20, latencyMs: 2.1, peeredSince: '2025-12-01', contactEmail: 'infosec@amex.com',
     region: 'US-EU', complianceFrameworks: ['PCI-DSS 4.0', 'SOC 2 Type II'],
   },
   {
     id: 'p-4', name: 'JPMorgan Chase', type: 'bank', logo: '🏦',
     isdNumber: 200, peeringStatus: 'active', trustLevel: 'drkey-established',
-    encryptionSuite: 'CRYSTALS-Kyber-1024 + AES-256-GCM', scionDevices: 36,
+    encryptionSuite: 'CRYSTALS-Kyber-1024 + AES-256-GCM', apexphalanxDevices: 36,
     throughputGbps: 25, latencyMs: 1.8, peeredSince: '2026-01-10', contactEmail: 'ciso-office@jpmorgan.com',
     region: 'US-EU-APAC', complianceFrameworks: ['PCI-DSS 4.0', 'SOC 2 Type II', 'FFIEC', 'NYDFS 500'],
   },
   {
     id: 'p-5', name: 'HSBC Holdings', type: 'bank', logo: '🌐',
     isdNumber: 201, peeringStatus: 'active', trustLevel: 'pki-cross-signed',
-    encryptionSuite: 'X25519 + AES-256-GCM', scionDevices: 30,
+    encryptionSuite: 'X25519 + AES-256-GCM', apexphalanxDevices: 30,
     throughputGbps: 18, latencyMs: 3.2, peeredSince: '2026-02-01', contactEmail: 'cyber-defence@hsbc.com',
     region: 'EU-APAC-MEA', complianceFrameworks: ['PCI-DSS 4.0', 'ISO 27001', 'MAS TRM'],
   },
   {
     id: 'p-6', name: 'DBS Bank', type: 'bank', logo: '🔷',
     isdNumber: 202, peeringStatus: 'negotiating', trustLevel: 'mutual-tls',
-    encryptionSuite: 'CRYSTALS-Kyber-768 + AES-256-GCM', scionDevices: 12,
+    encryptionSuite: 'CRYSTALS-Kyber-768 + AES-256-GCM', apexphalanxDevices: 12,
     throughputGbps: 10, latencyMs: 4.5, peeredSince: null, contactEmail: 'network-eng@dbs.com',
     region: 'APAC', complianceFrameworks: ['MAS TRM', 'ISO 27001'],
   },
   {
     id: 'p-7', name: 'Stripe Inc.', type: 'fintech', logo: '⚡',
     isdNumber: 300, peeringStatus: 'pending-cert', trustLevel: 'mutual-tls',
-    encryptionSuite: 'X25519 + ChaCha20-Poly1305', scionDevices: 8,
+    encryptionSuite: 'X25519 + ChaCha20-Poly1305', apexphalanxDevices: 8,
     throughputGbps: 5, latencyMs: 6.0, peeredSince: null, contactEmail: 'security@stripe.com',
     region: 'US-EU', complianceFrameworks: ['PCI-DSS 4.0', 'SOC 2 Type II'],
   },
   {
     id: 'p-8', name: 'Deutsche Bank', type: 'bank', logo: '🏛️',
     isdNumber: 203, peeringStatus: 'negotiating', trustLevel: 'mutual-tls',
-    encryptionSuite: 'CRYSTALS-Kyber-1024 + AES-256-GCM', scionDevices: 18,
+    encryptionSuite: 'CRYSTALS-Kyber-1024 + AES-256-GCM', apexphalanxDevices: 18,
     throughputGbps: 15, latencyMs: 2.8, peeredSince: null, contactEmail: 'cto-office@db.com',
     region: 'EU', complianceFrameworks: ['PCI-DSS 4.0', 'BaFin BAIT', 'ISO 27001'],
   },
@@ -133,7 +133,7 @@ const linkTypeLabel: Record<string, string> = {
 };
 
 /* ─── Component ─────────────────────────────────────────────── */
-export default function ScionPartnersPage() {
+export default function ApexphalanxPartnersPage() {
   const [activeTab, setActiveTab] = useState<'partners' | 'isd-topology' | 'trust-chain' | 'onboarding'>('partners');
   const [expandedPartner, setExpandedPartner] = useState<string | null>(null);
   const [showOnboardModal, setShowOnboardModal] = useState(false);
@@ -141,7 +141,7 @@ export default function ScionPartnersPage() {
   const [newPartnerType, setNewPartnerType] = useState<'bank' | 'payment-network' | 'financial-institution' | 'fintech'>('bank');
 
   const activePartners = partners.filter(p => p.peeringStatus === 'active').length;
-  const totalDevices = partners.reduce((s, p) => s + p.scionDevices, 0);
+  const totalDevices = partners.reduce((s, p) => s + p.apexphalanxDevices, 0);
   const totalThroughput = partners.filter(p => p.peeringStatus === 'active').reduce((s, p) => s + p.throughputGbps, 0);
   const avgLatency = partners.filter(p => p.peeringStatus === 'active').length > 0
     ? (partners.filter(p => p.peeringStatus === 'active').reduce((s, p) => s + p.latencyMs, 0) / partners.filter(p => p.peeringStatus === 'active').length).toFixed(1)
@@ -161,10 +161,10 @@ export default function ScionPartnersPage() {
         <div className="flex items-center gap-3">
           <Handshake size={24} className="text-cyan-400" />
           <div>
-            <h1 className="text-xl font-semibold">SCION + IP Gateway Partner Program</h1>
+            <h1 className="text-xl font-semibold">Apexphalanx + IP Gateway Partner Program</h1>
             <p className="text-sm text-gray-500">
               AegisRoute™ partner gateway for banks, payment networks & financial institutions — 
-              sell SCION + IP gateways to partners, establish ISD neighbourships & high-performance encryption
+              sell Apexphalanx + IP gateways to partners, establish ISD neighbourships & high-performance encryption
             </p>
           </div>
         </div>
@@ -179,7 +179,7 @@ export default function ScionPartnersPage() {
         {[
           { label: 'Partner Organizations', value: partners.length, icon: Building2, color: 'text-cyan-400' },
           { label: 'Active Peerings', value: activePartners, icon: CheckCircle, color: 'text-green-400' },
-          { label: 'SCION Devices', value: totalDevices, icon: Router, color: 'text-blue-400' },
+          { label: 'Apexphalanx Devices', value: totalDevices, icon: Router, color: 'text-blue-400' },
           { label: 'Total Throughput', value: `${totalThroughput} Gbps`, icon: Zap, color: 'text-amber-400' },
           { label: 'Avg Latency', value: `${avgLatency} ms`, icon: Activity, color: 'text-purple-400' },
           { label: 'ISD Neighbourhoods', value: isdNeighborhoods.filter(n => n.status === 'established').length, icon: Network, color: 'text-emerald-400' },
@@ -196,15 +196,15 @@ export default function ScionPartnersPage() {
 
       {/* How It Works Banner */}
       <div className="bg-gradient-to-r from-cyan-950/40 via-gray-900 to-amber-950/30 border border-cyan-800/30 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-cyan-400 mb-3">AegisRoute™ Partner Model — SCION + IP Gateway for Financial Sector</h3>
+        <h3 className="text-sm font-semibold text-cyan-400 mb-3">AegisRoute™ Partner Model — Apexphalanx + IP Gateway for Financial Sector</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-amber-400 font-medium"><CreditCard size={14} /> 1. Sell to Partners</div>
-            <p className="text-gray-400">ApexAegis sells SCION + IP gateway appliances (physical or virtual) to banks and payment networks on behalf of financial sector partners.</p>
+            <p className="text-gray-400">ApexAegis sells Apexphalanx + IP gateway appliances (physical or virtual) to banks and payment networks on behalf of financial sector partners.</p>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-cyan-400 font-medium"><Network size={14} /> 2. Establish ISD</div>
-            <p className="text-gray-400">Each partner receives a dedicated SCION Isolation Security Domain (ISD). ISD neighbourship is established between ApexAegis core and partner domain.</p>
+            <p className="text-gray-400">Each partner receives a dedicated Apexphalanx Isolation Security Domain (ISD). ISD neighbourship is established between ApexAegis core and partner domain.</p>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-green-400 font-medium"><Shield size={14} /> 3. Build Trust</div>
@@ -212,7 +212,7 @@ export default function ScionPartnersPage() {
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-purple-400 font-medium"><Lock size={14} /> 4. Encrypt & Route</div>
-            <p className="text-gray-400">High-performance post-quantum encryption (CRYSTALS-Kyber-1024) tunnels between ApexAegis cloud and partner SCION devices with path-aware routing.</p>
+            <p className="text-gray-400">High-performance post-quantum encryption (CRYSTALS-Kyber-1024) tunnels between ApexAegis cloud and partner Apexphalanx devices with path-aware routing.</p>
           </div>
         </div>
       </div>
@@ -266,8 +266,8 @@ export default function ScionPartnersPage() {
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
                 <div className="p-2.5 bg-gray-800/30 rounded-lg">
-                  <div className="text-gray-500 mb-1">SCION Devices</div>
-                  <span className="text-gray-200 font-semibold text-sm">{partner.scionDevices}</span>
+                  <div className="text-gray-500 mb-1">Apexphalanx Devices</div>
+                  <span className="text-gray-200 font-semibold text-sm">{partner.apexphalanxDevices}</span>
                 </div>
                 <div className="p-2.5 bg-gray-800/30 rounded-lg">
                   <div className="text-gray-500 mb-1">Throughput</div>
@@ -389,10 +389,10 @@ export default function ScionPartnersPage() {
             <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><Shield size={16} className="text-green-400" /> Trust Establishment Between Entities</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-xs">
               {[
-                { step: 1, title: 'Certificate Exchange', desc: 'Partner submits TLS/ISD signing certificates. ApexAegis validates chain of trust via SCION TRC (Trust Root Configuration).', icon: Lock, color: 'text-blue-400' },
-                { step: 2, title: 'ISD Allocation', desc: 'Unique Isolation Security Domain assigned. Partner receives ISD number, AS number, and SCION addressing space.', icon: Network, color: 'text-cyan-400' },
+                { step: 1, title: 'Certificate Exchange', desc: 'Partner submits TLS/ISD signing certificates. ApexAegis validates chain of trust via Apexphalanx TRC (Trust Root Configuration).', icon: Lock, color: 'text-blue-400' },
+                { step: 2, title: 'ISD Allocation', desc: 'Unique Isolation Security Domain assigned. Partner receives ISD number, AS number, and Apexphalanx addressing space.', icon: Network, color: 'text-cyan-400' },
                 { step: 3, title: 'DRKey Session Keys', desc: 'Dynamically Recreatable Key (DRKey) protocol establishes per-session symmetric keys without out-of-band key exchange.', icon: Zap, color: 'text-amber-400' },
-                { step: 4, title: 'Mutual Authentication', desc: 'Both entities authenticate via SCION control-plane PKI. Cross-signed certificates enable bidirectional trust attestation.', icon: Handshake, color: 'text-green-400' },
+                { step: 4, title: 'Mutual Authentication', desc: 'Both entities authenticate via Apexphalanx control-plane PKI. Cross-signed certificates enable bidirectional trust attestation.', icon: Handshake, color: 'text-green-400' },
                 { step: 5, title: 'Encrypted Path Setup', desc: 'High-performance tunnels with CRYSTALS-Kyber-1024 key encapsulation + AES-256-GCM data encryption. Path-aware routing via AegisRoute™.', icon: ArrowRightLeft, color: 'text-purple-400' },
               ].map(s => (
                 <div key={s.step} className="p-3 bg-gray-800/30 rounded-lg border border-gray-800">
@@ -539,7 +539,7 @@ export default function ScionPartnersPage() {
           <div className="fixed inset-0 bg-black/60 z-40" role="button" tabIndex={0} aria-label="Close" onClick={() => setShowOnboardModal(false)} onKeyDown={e => e.key === 'Escape' && setShowOnboardModal(false)} />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2"><Handshake size={16} className="text-cyan-400" /> Onboard SCION Partner</h3>
+              <h3 className="text-sm font-semibold flex items-center gap-2"><Handshake size={16} className="text-cyan-400" /> Onboard Apexphalanx Partner</h3>
               <button onClick={() => setShowOnboardModal(false)} className="text-gray-400 hover:text-gray-200"><X size={16} /></button>
             </div>
             <div className="space-y-3 mb-5">
@@ -563,7 +563,7 @@ export default function ScionPartnersPage() {
                 <p className="text-cyan-400 font-medium mb-1">Onboarding will initiate:</p>
                 <ul className="list-disc list-inside space-y-0.5">
                   <li>ISD number allocation from ApexAegis registry</li>
-                  <li>SCION + IP gateway provisioning (physical or virtual appliance)</li>
+                  <li>Apexphalanx + IP gateway provisioning (physical or virtual appliance)</li>
                   <li>TRC certificate generation and cross-signing request</li>
                   <li>DRKey key derivation service enrollment</li>
                   <li>Compliance review initiation (auto-detect framework)</li>
