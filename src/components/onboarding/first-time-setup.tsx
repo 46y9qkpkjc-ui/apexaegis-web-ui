@@ -1,16 +1,13 @@
 'use client';
 
 /**
- * First-time setup wizard — shown after SSO login to let the operator stand up a full
- * governance posture and watch the workspace configure itself. Covers: governance
- * frameworks, DNS/URL deny categories, DPI depth, sanctioned apps & AI, private-access
- * tenant + connector + discovered apps, and IDS/IPS/WAF + AV profiles.
+ * First-time setup wizard — shown on every login/session initialization to let the
+ * operator review or stand up a full governance posture.
  *
- * Demo re-trigger: every Guacamole viewer signs in as the same demo user from the same
- * VDI egress IP, so neither email nor IP can distinguish viewers. The wizard is TIMER-
- * gated (re-shows if not shown in the last 45 min, even if completed), plus an
- * `aa:open-setup` window event / header button forces it open, plus it polls the /vdi
- * gate's "latest access" signal to auto-open for each fresh self-serve viewer.
+ * Logic:
+ * - Always opens on session mount (regardless of prior completions or elapsed time).
+ * - If setup was previously completed, pre-fills saved state and allows instant dismissal (X).
+ * - If setup is incomplete, forces completion before entering the workspace.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -22,17 +19,9 @@ import {
 import { useAuthStore } from '@/lib/auth-store';
 
 const ACCENT = '#6D4AFF';
-const SHOWN_KEY = 'aa_setup_shown_at';
 const FRAMEWORKS_KEY = 'aa_governance_frameworks';
 const CONFIG_KEY = 'aa_governance_config';        // full persisted posture (all selections)
 const COMPLETED_KEY = 'aa_governance_completed';   // ISO timestamp when setup was completed
-const REDISPLAY_MS = 45 * 60 * 1000; // 45 minutes
-
-// Self-serve auto-trigger: the /vdi gate records each OTP-verified viewer; the wizard
-// polls this signal and opens for each fresh viewer (no presenter needed).
-const ACCESS_ENDPOINT = 'https://apexastute.com/api/demo-access/latest';
-const ACCESS_SEEN_KEY = 'aa_last_access_seen';
-const ACCESS_POLL_MS = 20000;
 
 // Step model. 1..5 are the config screens; 6 provisions; 7 is done.
 const STEP_WELCOME = 0, STEP_FRAMEWORKS = 1, STEP_CONTENT = 2, STEP_APPS = 3,
@@ -116,14 +105,19 @@ export function FirstTimeSetup() {
         if (typeof c.ids === 'string') setIds(c.ids);
         if (typeof c.av === 'string') setAv(c.av);
       }
-      setCompletedAt(localStorage.getItem(COMPLETED_KEY));
-    } catch { /* ignore */ }
+      const done = localStorage.getItem(COMPLETED_KEY);
+      setCompletedAt(done);
+      return done;
+    } catch {
+      return null;
+    }
   }, []);
 
   const openNow = useCallback(() => {
     applyPersisted();
-    setStep(STEP_WELCOME); setProvisionIdx(0); setOpen(true);
-    try { localStorage.setItem(SHOWN_KEY, String(Date.now())); } catch { /* private mode */ }
+    setStep(STEP_WELCOME);
+    setProvisionIdx(0);
+    setOpen(true);
   }, [applyPersisted]);
 
   // Prefill tenant ID from the signed-in session if available.
@@ -133,48 +127,18 @@ export function FirstTimeSetup() {
     if (t && !tenantId) setTenantId(t);
   }, [user, tenantId]);
 
-  // Auto-open: always show until the admin COMPLETES setup; once completed, re-show only
-  // on the 45-min demo timer (pre-filled + closable) so each fresh CIO/CISO session gets
-  // the experience without nagging a returning admin.
+  // Always trigger the wizard on login/page load when authenticated.
   useEffect(() => {
     if (!accessToken) return;
-    let completed: string | null = null, last = 0;
-    try { completed = localStorage.getItem(COMPLETED_KEY); last = Number(localStorage.getItem(SHOWN_KEY) || 0); } catch { /* ignore */ }
-    if (!completed) { openNow(); return; }
-    if (!last || Date.now() - last > REDISPLAY_MS) openNow();
+    openNow();
   }, [accessToken, openNow]);
 
-  // Manual re-trigger for the presenter (header button / devtools dispatch).
+  // Manual re-trigger listener.
   useEffect(() => {
     const h = () => openNow();
     window.addEventListener('aa:open-setup', h);
     return () => window.removeEventListener('aa:open-setup', h);
   }, [openNow]);
-
-  // Self-serve auto-trigger: poll the gate's "latest access" timestamp. When a new viewer
-  // verifies at apexastute.com/vdi, open the wizard for them. The first poll only syncs a
-  // baseline (never opens on historical access); fail-soft if apexastute is unreachable.
-  useEffect(() => {
-    if (!accessToken) return;
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const res = await fetch(ACCESS_ENDPOINT, { cache: 'no-store' });
-        if (!res.ok || cancelled) return;
-        const { at } = await res.json() as { at?: number };
-        if (!at) return;
-        let seen = 0;
-        try { seen = Number(localStorage.getItem(ACCESS_SEEN_KEY) || 0); } catch { /* ignore */ }
-        if (at > seen) {
-          try { localStorage.setItem(ACCESS_SEEN_KEY, String(at)); } catch { /* ignore */ }
-          if (seen > 0) openNow(); // only after a baseline exists
-        }
-      } catch { /* apexastute unreachable — timer + wand button still cover it */ }
-    };
-    check();
-    const id = setInterval(check, ACCESS_POLL_MS);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [accessToken, openNow]);
 
   const chosen = FRAMEWORKS.filter(f => selected.includes(f.id));
   const provisionTasks = [
@@ -190,7 +154,10 @@ export function FirstTimeSetup() {
   // Provisioning animation → advances through the tasks, then to "done".
   useEffect(() => {
     if (step !== STEP_PROVISION) return;
-    if (provisionIdx >= provisionTasks.length) { const t = setTimeout(() => setStep(STEP_DONE), 500); return () => clearTimeout(t); }
+    if (provisionIdx >= provisionTasks.length) {
+      const t = setTimeout(() => setStep(STEP_DONE), 500);
+      return () => clearTimeout(t);
+    }
     const t = setTimeout(() => setProvisionIdx(i => i + 1), 620);
     return () => clearTimeout(t);
   }, [step, provisionIdx, provisionTasks.length]);
@@ -206,12 +173,13 @@ export function FirstTimeSetup() {
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
       localStorage.setItem(FRAMEWORKS_KEY, JSON.stringify(selected));
       localStorage.setItem(COMPLETED_KEY, new Date().toISOString());
+      setCompletedAt(new Date().toISOString());
     } catch { /* ignore */ }
     setOpen(false);
   };
 
   const firstName = (user?.name || user?.email || 'there').split(/[ @]/)[0];
-  const configIdx = CONFIG_STEPS.indexOf(step); // 0-based within the config screens
+  const configIdx = CONFIG_STEPS.indexOf(step);
 
   // ── small render helpers ───────────────────────────────────────────────────
   const chip = (label: string, on: boolean, onClick: () => void) => (
@@ -225,6 +193,7 @@ export function FirstTimeSetup() {
       {label}
     </button>
   );
+
   const radio = (opts: { id: string; name: string; desc: string }[], val: string, set: (v: string) => void) => (
     <div className="space-y-2">
       {opts.map(o => {
@@ -245,6 +214,7 @@ export function FirstTimeSetup() {
       })}
     </div>
   );
+
   const navRow = (back: number, next: number, nextLabel: string, nextDisabled = false) => (
     <div className="flex items-center justify-between mt-6">
       <button onClick={() => setStep(back)} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-300"><ArrowLeft size={15} /> Back</button>
@@ -255,6 +225,7 @@ export function FirstTimeSetup() {
       </button>
     </div>
   );
+
   const sectionHead = (Icon: typeof Ban, title: string, sub: string) => (
     <div className="mb-4">
       <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2"><Icon size={18} style={{ color: ACCENT }} /> {title}</h2>
@@ -272,10 +243,19 @@ export function FirstTimeSetup() {
         <div className="flex items-center justify-between px-6 pt-5">
           <span className="inline-flex items-center gap-2 text-white font-semibold" style={{ fontFamily: "'Outfit',sans-serif" }}>
             <ShieldCheck size={20} style={{ color: ACCENT }} /> Apex <span style={{ color: ACCENT }}>Aegis</span>
-            <span className="ml-2 text-[11px] uppercase tracking-wider text-gray-500">First-time setup</span>
+            <span className="ml-2 text-[11px] uppercase tracking-wider text-gray-500">
+              {completedAt ? 'Governance Posture' : 'First-time setup'}
+            </span>
           </span>
-          {step < STEP_PROVISION && (
-            <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-gray-300" aria-label="Skip for now"><X size={18} /></button>
+          {/* Close button: allowed if setup has been completed, or while not provisioning */}
+          {completedAt && step !== STEP_PROVISION && (
+            <button
+              onClick={() => setOpen(false)}
+              className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors"
+              aria-label="Close setup wizard"
+            >
+              <X size={18} />
+            </button>
           )}
         </div>
 
@@ -301,20 +281,32 @@ export function FirstTimeSetup() {
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">Welcome, {firstName}.</h1>
               <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-                Let&apos;s stand up your ApexAegis posture — governance frameworks, content controls, inspection depth,
-                sanctioned apps &amp; AI, private access, and your IDS/IPS/WAF + AV profiles. The console configures itself around your choices.
+                Configure your ApexAegis posture — governance frameworks, content controls, inspection depth,
+                sanctioned apps &amp; AI, private access, and IDS/IPS/WAF + AV profiles.
               </p>
               {completedAt && (
                 <div className="mt-5 mx-auto max-w-md px-4 py-2.5 rounded-xl text-[12.5px] flex items-center gap-2 justify-center"
                   style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', color: '#86efac' }}>
-                  <Check size={14} /> Setup already completed on {new Date(completedAt).toLocaleDateString()} — review your posture or close.
+                  <Check size={14} /> Setup completed on {new Date(completedAt).toLocaleDateString()} — modify your configuration or close anytime.
                 </div>
               )}
-              <button onClick={() => setStep(STEP_FRAMEWORKS)}
-                className="mt-8 inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white transition-all"
-                style={{ background: `linear-gradient(90deg,${ACCENT},#8b6dff)` }}>
-                {completedAt ? 'Review posture' : 'Get started'} <ArrowRight size={16} />
-              </button>
+              <div className="mt-8 flex items-center justify-center gap-3">
+                {completedAt && (
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="px-5 py-3 rounded-xl text-sm font-medium text-gray-300 border border-white/10 hover:bg-white/5 transition-all"
+                  >
+                    Close
+                  </button>
+                )}
+                <button
+                  onClick={() => setStep(STEP_FRAMEWORKS)}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white transition-all"
+                  style={{ background: `linear-gradient(90deg,${ACCENT},#8b6dff)` }}
+                >
+                  {completedAt ? 'Review & edit posture' : 'Get started'} <ArrowRight size={16} />
+                </button>
+              </div>
             </div>
           )}
 
