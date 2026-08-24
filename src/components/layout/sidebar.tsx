@@ -10,14 +10,52 @@ import { fetchEntitlements } from '@/lib/tenants-api';
 import { useBrand, getBrand } from '@/lib/brands';
 import { useAuthStore, isMspUser } from '@/lib/auth-store';
 import {
-  ShieldAlert, Search, ShieldOff, Building2,
-  Database, UserCog, Radar, Compass,
-  FileText, MessageSquare, RotateCw, // 👈 Replaced invalid Lucide icon names
+  type LucideIcon,
+  // Existing icons
+  Shield,
+  ShieldAlert,
+  ShieldOff,
+  ShieldCheck,
+  Search,
+  Building2,
+  Database,
+  UserCog,
+  Radar,
+  Compass,
+  FileText,
+  MessageSquare,
+  RotateCw,
+  // Previously missing icons
+  Activity,
+  AlertTriangle,
+  ArrowDownToLine,
+  Award,
+  BarChart3,
+  Bot,
+  Brain,
+  Bug,
+  ChevronLeft,
+  ChevronRight,
+  Crosshair,
+  Ghost,
+  GitBranch,
+  Globe,
+  Key,
+  MonitorSmartphone,
+  Network,
+  Router,
+  Server,
+  Settings,
+  Smartphone,
+  Users,
+  Wifi,
+  Workflow,
+  Lock,
 } from 'lucide-react';
 
 interface NavItem {
   href: string;
-  icon: typeof Shield;
+  icon: LucideIcon;
   label: string;
   featureId?: string; // maps to feature licensing ID
   premium?: boolean;  // gated by subscription tier — locked (Subscribe to activate) when not entitled
