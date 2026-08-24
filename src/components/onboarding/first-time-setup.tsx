@@ -4,17 +4,19 @@
  * ApexAegis First-Time Setup Wizard
  * Configures:
  * 1. Governance & Regulatory Frameworks
- * 2. 0-100 Continuous Adaptive Trust & Dynamic Enforcement
- * 3. Top Sanctioned SaaS & Agentic AI App Catalog
- * 4. Predictive QoE & Local Physical NIC Optimization
- * 5. Sovereign Micro-Cells, Hardware Geocoding & Private In-Country Hiero aBFT Ledger
+ * 2. Identity Provider (IdP) Onboarding & Directory Sync (Entra, Okta, Ping, Google)
+ * 3. 0-100 Continuous Adaptive Trust & Dynamic Enforcement
+ * 4. Top Sanctioned SaaS & Agentic AI App Catalog
+ * 5. Predictive QoE & Local Physical NIC Optimization
+ * 6. Third-Party Telemetry, ITDR Ingestion & Sovereign Micro-Cells (In-Country Hiero DLT)
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck, ArrowRight, ArrowLeft, Check, Loader2, Sparkles,
   Landmark, Globe2, CreditCard, HeartPulse, Building2, ListChecks, X,
-  Activity, Sliders, Database, Network, Zap, MapPin, Lock, Server, Cpu
+  Activity, Sliders, Database, Network, Zap, MapPin, Lock, Server, Cpu,
+  Fingerprint, Key, FileText, Download, ExternalLink, HelpCircle
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
 
@@ -22,18 +24,20 @@ const ACCENT = '#6D4AFF';
 const CONFIG_KEY = 'aa_governance_config';
 const COMPLETED_KEY = 'aa_governance_completed';
 
-// Step flow definition
+// Wizard Step Sequence
 const STEP_WELCOME = 0;
 const STEP_FRAMEWORKS = 1;
-const STEP_RISK_TAXONOMY = 2;
-const STEP_APPS_DISCOVERY = 3;
-const STEP_QOE_NIC = 4;
-const STEP_SOVEREIGN_CELL = 5;
-const STEP_PROVISION = 6;
-const STEP_DONE = 7;
+const STEP_IDP_ONBOARDING = 2;
+const STEP_RISK_TAXONOMY = 3;
+const STEP_APPS_DISCOVERY = 4;
+const STEP_QOE_NIC = 5;
+const STEP_SOVEREIGN_CELL = 6;
+const STEP_PROVISION = 7;
+const STEP_DONE = 8;
 
 const CONFIG_STEPS = [
   STEP_FRAMEWORKS,
+  STEP_IDP_ONBOARDING,
   STEP_RISK_TAXONOMY,
   STEP_APPS_DISCOVERY,
   STEP_QOE_NIC,
@@ -58,6 +62,13 @@ const FRAMEWORKS: Framework[] = [
   { id: 'hipaa',       name: 'HIPAA Security Rule',     desc: 'ePHI healthcare data & DLP controls', icon: HeartPulse },
 ];
 
+const IDP_PROVIDERS = [
+  { id: 'entra', name: 'Microsoft Entra ID (Azure AD)', desc: 'OIDC / SAML 2.0 + SCIM 2.0 Graph API Sync', guideKey: 'entra-id-guide' },
+  { id: 'okta',  name: 'Okta Identity Cloud',          desc: 'Universal Directory + Push SCIM Groups',       guideKey: 'okta-guide' },
+  { id: 'ping',  name: 'PingFederate / PingOne',       desc: 'Enterprise SAML 2.0 Bridge & NHI Scopes',    guideKey: 'ping-guide' },
+  { id: 'google',name: 'Google Workspace',             desc: 'Secure Web Identity & Workspace Directory',    guideKey: 'google-guide' },
+];
+
 const SANCTIONED_PRESETS = [
   'Microsoft 365', 'Google Workspace', 'Salesforce', 'GitHub Enterprise',
   'Slack Enterprise', 'Zoom Meetings', 'ChatGPT Enterprise', 'Claude Team',
@@ -71,6 +82,13 @@ const SOVEREIGN_CELL_REGIONS = [
   { id: 'sg-ap-southeast-1', name: 'Singapore Enclave (AWS ap-southeast-1)', desc: 'MAS TRM compliance · Regional sovereign vault' },
 ];
 
+const TELEMETRY_PARTNERS = [
+  { id: 'crowdstrike', name: 'CrowdStrike Falcon', type: 'EDR / ITDR Webhook', doc: 'CrowdStrike_FDR_Ingest.pdf' },
+  { id: 'defender',    name: 'Microsoft Defender XDR', type: 'Graph Security API', doc: 'Defender_XDR_Setup.pdf' },
+  { id: 'sentinelone', name: 'SentinelOne Singularity', type: 'Cloud-to-Cloud API', doc: 'SentinelOne_Deep_Visibility.pdf' },
+  { id: 'splunk',      name: 'Splunk / HEC Streaming', type: 'HTTP Event Collector', doc: 'Splunk_HEC_Integration.pdf' },
+];
+
 export function FirstTimeSetup() {
   const { user, accessToken } = useAuthStore();
   const [open, setOpen] = useState(false);
@@ -79,26 +97,40 @@ export function FirstTimeSetup() {
 
   // Posture States
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>(['nist-800-53', 'iso-27001', 'soc2']);
+  
+  // IdP States
+  const [selectedIdp, setSelectedIdp] = useState('entra');
+  const [idpIssuerUrl, setIdpIssuerUrl] = useState('');
+  const [idpClientId, setIdpClientId] = useState('');
+  const [idpClientSecret, setIdpClientSecret] = useState('');
+  
+  // Risk & Apps
   const [riskSensitivity, setRiskSensitivity] = useState<'strict' | 'balanced' | 'adaptive'>('adaptive');
   const [sanctionedApps, setSanctionedApps] = useState<string[]>(['Microsoft 365', 'GitHub Enterprise', 'ChatGPT Enterprise', 'Slack Enterprise']);
   const [qoeOptimization, setQoeOptimization] = useState(true);
   const [nicBackoffThreshold, setNicBackoffThreshold] = useState('80');
   
-  // Sovereign Cell & Distributed Ledger States
+  // Sovereignty, DLT & Telemetry States
   const [sovereignRegion, setSovereignRegion] = useState('in-ap-south-1');
   const [geofenceEnforcement, setGeofenceEnforcement] = useState<'strict_hw' | 'bgp_path' | 'permissive'>('strict_hw');
   const [enablePrivateHiero, setEnablePrivateHiero] = useState(true);
   const [hieroConsensusMode, setHieroConsensusMode] = useState<'private_cluster' | 'public_anchor'>('private_cluster');
   const [logRetentionPeriod, setLogRetentionPeriod] = useState('180-days');
+  const [selectedTelemetryPartner, setSelectedTelemetryPartner] = useState('crowdstrike');
   const [telemetryMode, setTelemetryMode] = useState<'webhook' | 'apikey'>('webhook');
+  const [webhookUrl] = useState('https://ingest.apexaegis.app/v1/telemetry/wh_live_9f82d018c');
   const [completedAt, setCompletedAt] = useState<string | null>(null);
 
+  // Load prior posture configuration
   const applyPersisted = useCallback(() => {
     try {
       const raw = localStorage.getItem(CONFIG_KEY);
       if (raw) {
         const c = JSON.parse(raw) as Record<string, unknown>;
         if (Array.isArray(c.selectedFrameworks)) setSelectedFrameworks(c.selectedFrameworks as string[]);
+        if (typeof c.selectedIdp === 'string') setSelectedIdp(c.selectedIdp);
+        if (typeof c.idpIssuerUrl === 'string') setIdpIssuerUrl(c.idpIssuerUrl);
+        if (typeof c.idpClientId === 'string') setIdpClientId(c.idpClientId);
         if (typeof c.riskSensitivity === 'string') setRiskSensitivity(c.riskSensitivity as 'strict' | 'balanced' | 'adaptive');
         if (Array.isArray(c.sanctionedApps)) setSanctionedApps(c.sanctionedApps as string[]);
         if (typeof c.qoeOptimization === 'boolean') setQoeOptimization(c.qoeOptimization);
@@ -112,7 +144,10 @@ export function FirstTimeSetup() {
       }
       const done = localStorage.getItem(COMPLETED_KEY);
       setCompletedAt(done);
-    } catch { /* ignore */ }
+      return done;
+    } catch {
+      return null;
+    }
   }, []);
 
   const openNow = useCallback(() => {
@@ -126,14 +161,16 @@ export function FirstTimeSetup() {
     if (accessToken) openNow();
   }, [accessToken, openNow]);
 
+  // Provisioning steps pipeline
   const provisionTasks = [
     `Compiling ${selectedFrameworks.length} governance framework control policies`,
+    `Binding IdP Connector (${IDP_PROVIDERS.find(i => i.id === selectedIdp)?.name}) & SCIM Directory`,
     `Initializing Continuous Adaptive Trust engine (0-100 Sensitivity: ${riskSensitivity})`,
     `Governing ${sanctionedApps.length} sanctioned apps with NHI & OAuth boundaries`,
     `Configuring Predictive QoE NIC contention back-off (> ${nicBackoffThreshold}% utilization)`,
-    `Isolating Sovereign Cell Enclave in ${SOVEREIGN_CELL_REGIONS.find(r => r.id === sovereignRegion)?.name}`,
+    `Isolating Sovereign Cell in ${SOVEREIGN_CELL_REGIONS.find(r => r.id === sovereignRegion)?.name}`,
     `Activating Hardware/GPS Geocoded Routing Boundary (${geofenceEnforcement})`,
-    `Deploying In-Country Private Hiero aBFT Consensus Nodes & S3 WORM (${logRetentionPeriod})`,
+    `Deploying In-Country Private Hiero aBFT Nodes & S3 WORM (${logRetentionPeriod})`,
   ];
 
   useEffect(() => {
@@ -142,7 +179,7 @@ export function FirstTimeSetup() {
       const t = setTimeout(() => setStep(STEP_DONE), 500);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => setProvisionIdx(i => i + 1), 620);
+    const t = setTimeout(() => setProvisionIdx(i => i + 1), 580);
     return () => clearTimeout(t);
   }, [step, provisionIdx, provisionTasks.length]);
 
@@ -154,6 +191,9 @@ export function FirstTimeSetup() {
   const finish = () => {
     const config = {
       selectedFrameworks,
+      selectedIdp,
+      idpIssuerUrl,
+      idpClientId,
       riskSensitivity,
       sanctionedApps,
       qoeOptimization,
@@ -167,8 +207,9 @@ export function FirstTimeSetup() {
     };
     try {
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-      localStorage.setItem(COMPLETED_KEY, new Date().toISOString());
-      setCompletedAt(new Date().toISOString());
+      const nowIso = new Date().toISOString();
+      localStorage.setItem(COMPLETED_KEY, nowIso);
+      setCompletedAt(nowIso);
     } catch { /* ignore */ }
     setOpen(false);
   };
@@ -206,26 +247,26 @@ export function FirstTimeSetup() {
       <div className="w-full max-w-2xl rounded-2xl border overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
         style={{ background: 'linear-gradient(180deg,#141033,#0e0a24)', borderColor: 'rgba(109,74,255,0.25)' }}>
 
-        {/* Header */}
+        {/* Top Header */}
         <div className="flex items-center justify-between px-6 pt-5">
           <span className="inline-flex items-center gap-2 text-white font-semibold tracking-wide">
             <ShieldCheck size={20} style={{ color: ACCENT }} /> Apex <span style={{ color: ACCENT }}>Aegis</span>
             <span className="ml-2 text-[11px] uppercase tracking-wider text-gray-400 bg-white/5 px-2 py-0.5 rounded">
-              {completedAt ? 'Security Posture' : 'Zero Trust Setup'}
+              {completedAt ? 'Security Posture Configured' : 'Zero Trust Onboarding'}
             </span>
           </span>
           {completedAt && step !== STEP_PROVISION && (
-            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white p-1 rounded-lg">
+            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-all">
               <X size={18} />
             </button>
           )}
         </div>
 
-        {/* Progress */}
+        {/* Dynamic Progress Bar */}
         <div className="px-6 pt-4">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] uppercase tracking-wider text-gray-500">
-              {configIdx >= 0 ? `Step ${configIdx + 1} of ${CONFIG_STEPS.length}` : step >= STEP_PROVISION ? 'Applying Posture' : 'Welcome'}
+              {configIdx >= 0 ? `Step ${configIdx + 1} of ${CONFIG_STEPS.length}` : step >= STEP_PROVISION ? 'Applying Changes' : 'Welcome'}
             </span>
           </div>
           <div className="h-1 rounded-full overflow-hidden bg-white/10">
@@ -237,7 +278,7 @@ export function FirstTimeSetup() {
         </div>
 
         <div className="px-6 py-6 overflow-y-auto flex-1">
-          {/* ── 0 · Welcome ── */}
+          {/* ── 0 · Welcome Screen ── */}
           {step === STEP_WELCOME && (
             <div className="text-center py-6">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 border"
@@ -246,19 +287,37 @@ export function FirstTimeSetup() {
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">Welcome to ApexAegis, {firstName}.</h1>
               <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-                Deploy your adaptive Zero Trust posture: governance frameworks, 0–100 continuous risk scoring, sanctioned AI discovery, predictive QoE, and sovereign micro-cells with in-country distributed ledger auditing.
+                Initialize your Zero Trust posture: governance frameworks, IdP onboarding, 0–100 CATE risk engine, sanctioned SaaS/AI discovery, predictive QoE, and in-country sovereign ledger governance.
               </p>
-              <button
-                onClick={() => setStep(STEP_FRAMEWORKS)}
-                className="mt-8 inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white"
-                style={{ background: `linear-gradient(90deg,${ACCENT},#8b6dff)` }}
-              >
-                {completedAt ? 'Review & Edit Configuration' : 'Launch Posture Setup'} <ArrowRight size={16} />
-              </button>
+
+              {completedAt && (
+                <div className="mt-5 mx-auto max-w-md px-4 py-2.5 rounded-xl text-[12.5px] flex items-center gap-2 justify-center"
+                  style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', color: '#86efac' }}>
+                  <Check size={14} /> Posture active since {new Date(completedAt).toLocaleDateString()} at {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                </div>
+              )}
+
+              <div className="mt-8 flex items-center justify-center gap-3">
+                {completedAt && (
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="px-5 py-3 rounded-xl text-sm font-medium text-gray-300 border border-white/10 hover:bg-white/5 transition-all"
+                  >
+                    Enter Console Directly
+                  </button>
+                )}
+                <button
+                  onClick={() => setStep(STEP_FRAMEWORKS)}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white transition-all shadow-lg"
+                  style={{ background: `linear-gradient(90deg,${ACCENT},#8b6dff)` }}
+                >
+                  {completedAt ? 'Review & Edit Configuration' : 'Launch Posture Setup'} <ArrowRight size={16} />
+                </button>
+              </div>
             </div>
           )}
 
-          {/* ── 1 · Frameworks ── */}
+          {/* ── 1 · Governance Frameworks ── */}
           {step === STEP_FRAMEWORKS && (
             <div>
               {sectionHead(Landmark, 'Governance & Regulatory Frameworks', 'Auto-generate baseline access, encryption, and audit controls mapped to selected standards.')}
@@ -283,11 +342,90 @@ export function FirstTimeSetup() {
                   );
                 })}
               </div>
-              {navRow(STEP_WELCOME, STEP_RISK_TAXONOMY, `Continue (${selectedFrameworks.length} Selected)`, selectedFrameworks.length === 0)}
+              {navRow(STEP_WELCOME, STEP_IDP_ONBOARDING, `Continue (${selectedFrameworks.length} Selected)`, selectedFrameworks.length === 0)}
             </div>
           )}
 
-          {/* ── 2 · Risk Scoring & Dynamic Enforcement ── */}
+          {/* ── 2 · Identity Provider (IdP) Onboarding & Directory Sync ── */}
+          {step === STEP_IDP_ONBOARDING && (
+            <div>
+              {sectionHead(Fingerprint, 'Identity Provider (IdP) & SCIM Onboarding', 'Bind your enterprise identity provider for single sign-on, non-human identity (NHI) delegation, and directory sync.')}
+              
+              {/* IdP Selector */}
+              <div className="grid grid-cols-2 gap-2.5 mb-4">
+                {IDP_PROVIDERS.map(idp => {
+                  const on = selectedIdp === idp.id;
+                  return (
+                    <button key={idp.id} onClick={() => setSelectedIdp(idp.id)}
+                      className="p-3 rounded-xl border text-left transition-all"
+                      style={{ background: on ? 'rgba(109,74,255,0.12)' : 'rgba(255,255,255,0.02)', borderColor: on ? 'rgba(109,74,255,0.5)' : 'rgba(255,255,255,0.08)' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-gray-100">{idp.name}</span>
+                        {on && <span className="w-2 h-2 rounded-full" style={{ background: ACCENT }} />}
+                      </div>
+                      <span className="block text-[10.5px] text-gray-400 leading-tight">{idp.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* IdP Config Inputs */}
+              <div className="space-y-3 bg-white/5 p-4 rounded-xl border border-white/10 mb-4">
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">
+                    IdP Issuer URL / Domain Endpoint
+                  </label>
+                  <input
+                    value={idpIssuerUrl}
+                    onChange={e => setIdpIssuerUrl(e.target.value)}
+                    placeholder={selectedIdp === 'entra' ? 'https://login.microsoftonline.com/{tenant-id}/v2.0' : 'https://your-org.okta.com'}
+                    className="w-full px-3.5 py-2 rounded-lg text-xs font-mono text-white bg-black/40 border border-white/10 outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Application (Client) ID</label>
+                    <input
+                      value={idpClientId}
+                      onChange={e => setIdpClientId(e.target.value)}
+                      placeholder="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+                      className="w-full px-3.5 py-2 rounded-lg text-xs font-mono text-white bg-black/40 border border-white/10 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Client Secret</label>
+                    <input
+                      type="password"
+                      value={idpClientSecret}
+                      onChange={e => setIdpClientSecret(e.target.value)}
+                      placeholder="••••••••••••••••••••••••"
+                      className="w-full px-3.5 py-2 rounded-lg text-xs font-mono text-white bg-black/40 border border-white/10 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* PDF Guide Placeholder */}
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/[0.02]">
+                <div className="flex items-center gap-2 text-gray-300 text-xs">
+                  <FileText size={14} style={{ color: ACCENT }} />
+                  <span>Step-by-Step {IDP_PROVIDERS.find(i => i.id === selectedIdp)?.name} Integration Guide</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => alert(`Downloading ApexAegis_${selectedIdp.toUpperCase()}_Integration_Guide.pdf placeholder`)}
+                  className="inline-flex items-center gap-1.5 text-[11px] text-purple-300 hover:text-purple-200"
+                >
+                  <Download size={12} /> Download PDF Guide
+                </button>
+              </div>
+
+              {navRow(STEP_FRAMEWORKS, STEP_RISK_TAXONOMY, 'Continue to Risk Engine')}
+            </div>
+          )}
+
+          {/* ── 3 · 0-100 Risk Engine & Dynamic Enforcement ── */}
           {step === STEP_RISK_TAXONOMY && (
             <div>
               {sectionHead(Activity, '0–100 Risk Engine & Dynamic Enforcement', 'Define how continuous telemetry (EDR, travel velocity, agentic context) triggers automated mid-session controls.')}
@@ -313,11 +451,11 @@ export function FirstTimeSetup() {
                   );
                 })}
               </div>
-              {navRow(STEP_FRAMEWORKS, STEP_APPS_DISCOVERY, 'Continue')}
+              {navRow(STEP_IDP_ONBOARDING, STEP_APPS_DISCOVERY, 'Continue')}
             </div>
           )}
 
-          {/* ── 3 · Sanctioned Apps & AI Discovery ── */}
+          {/* ── 4 · Sanctioned SaaS & AI Discovery ── */}
           {step === STEP_APPS_DISCOVERY && (
             <div>
               {sectionHead(Sliders, 'Sanctioned SaaS & Agentic AI Catalog', 'Approve corporate SaaS and AI platforms. Enforces tenant-isolation, prompt DLP, and non-human identity (NHI) token governance.')}
@@ -341,7 +479,7 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 4 · Predictive QoE & NIC Optimization ── */}
+          {/* ── 5 · Predictive QoE & NIC Optimization ── */}
           {step === STEP_QOE_NIC && (
             <div>
               {sectionHead(Network, 'Predictive QoE & Physical NIC Optimization', 'Prioritize Teams, Zoom, and WebEx by dynamically throttling noisy background processes across both steered and bypassed flows.')}
@@ -373,10 +511,10 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 5 · Sovereign Micro-Cells & In-Country Distributed Ledger ── */}
+          {/* ── 6 · Sovereign Micro-Cells, ITDR Guides & Distributed Ledger ── */}
           {step === STEP_SOVEREIGN_CELL && (
             <div>
-              {sectionHead(Database, 'Sovereign Micro-Cells & Immutable DLT Engine', 'Isolate jurisdictions into self-contained private networks with in-country aBFT consensus.')}
+              {sectionHead(Database, 'Sovereignty, ITDR Ingestion & Immutable Ledger', 'Configure in-country enclave boundaries, telemetry streaming guides, and private Hiero aBFT state verification.')}
 
               {/* In-Country Enclave Selection */}
               <div className="mb-4">
@@ -403,20 +541,39 @@ export function FirstTimeSetup() {
                 </div>
               </div>
 
-              {/* Geocoding & Hardware Attestation */}
-              <div className="mb-4">
-                <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1.5 flex items-center gap-1.5">
-                  <MapPin size={13} /> Geocoding & Path-Aware Jurisdiction Control
-                </label>
-                <select
-                  value={geofenceEnforcement}
-                  onChange={e => setGeofenceEnforcement(e.target.value as 'strict_hw' | 'bgp_path' | 'permissive')}
-                  className="w-full px-3.5 py-2 rounded-lg text-xs text-gray-100 bg-white/5 border border-white/10 outline-none"
-                >
-                  <option value="strict_hw" className="bg-[#141033]">Strict Hardware Geocoding (OS GPS + Wi-Fi BSSID + BGP ASN)</option>
-                  <option value="bgp_path" className="bg-[#141033]">Network Path Geocoding (BGP Sovereign Path Traversal)</option>
-                  <option value="permissive" className="bg-[#141033]">Permissive (Geo-IP Lookup Only)</option>
-                </select>
+              {/* Third-Party Telemetry & ITDR Partner Ingestion */}
+              <div className="p-3.5 rounded-xl border border-white/10 bg-white/5 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                    <Zap size={13} /> Third-Party Telemetry & ITDR Partner Integration
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => alert(`Downloading ApexAegis_${selectedTelemetryPartner.toUpperCase()}_Ingest_Guide.pdf`)}
+                    className="inline-flex items-center gap-1 text-[10.5px] text-purple-300 hover:text-purple-200"
+                  >
+                    <Download size={11} /> Guide PDF
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {TELEMETRY_PARTNERS.map(tp => (
+                    <button
+                      key={tp.id}
+                      onClick={() => setSelectedTelemetryPartner(tp.id)}
+                      className={`px-3 py-2 rounded-lg border text-left text-xs transition-all ${selectedTelemetryPartner === tp.id ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-white/10 text-gray-400'}`}
+                    >
+                      <span className="font-semibold block">{tp.name}</span>
+                      <span className="text-[10px] opacity-70">{tp.type}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-2 border-t border-white/5">
+                  <label className="block text-[10.5px] text-gray-400 mb-1">Generated Real-Time Ingest Webhook (HMAC-SHA256)</label>
+                  <input readOnly value={webhookUrl}
+                    className="w-full px-3 py-1.5 rounded-lg text-xs font-mono text-purple-300 bg-black/40 border border-white/10 outline-none select-all" />
+                </div>
               </div>
 
               {/* In-Country Hiero Distributed Ledger */}
@@ -425,56 +582,25 @@ export function FirstTimeSetup() {
                   <div className="flex items-center gap-2">
                     <Cpu size={16} style={{ color: ACCENT }} />
                     <div>
-                      <span className="block text-xs font-medium text-gray-100">Private Hiero aBFT Consensus Engine</span>
-                      <span className="block text-[10.5px] text-gray-400">Deploys in-VPC Linux Foundation Hashgraph nodes for tamper-proof state proofs.</span>
+                      <span className="block text-xs font-medium text-gray-100">Private In-Country Hiero aBFT Ledger</span>
+                      <span className="block text-[10.5px] text-gray-400">Air-gapped Linux Foundation Hashgraph validator nodes inside sovereign AWS VPC.</span>
                     </div>
                   </div>
                   <input type="checkbox" checked={enablePrivateHiero} onChange={e => setEnablePrivateHiero(e.target.checked)} className="w-4 h-4 accent-purple-600" />
                 </div>
-
-                {enablePrivateHiero && (
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
-                    <button
-                      onClick={() => setHieroConsensusMode('private_cluster')}
-                      className={`px-2.5 py-2 rounded-lg border text-[11px] text-left transition-all ${hieroConsensusMode === 'private_cluster' ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-white/10 text-gray-400'}`}
-                    >
-                      <span className="font-semibold block">Air-Gapped Private Nodes</span>
-                      <span className="text-[9.5px] opacity-70">100% In-Country VPC Isolation</span>
-                    </button>
-                    <button
-                      onClick={() => setHieroConsensusMode('public_anchor')}
-                      className={`px-2.5 py-2 rounded-lg border text-[11px] text-left transition-all ${hieroConsensusMode === 'public_anchor' ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-white/10 text-gray-400'}`}
-                    >
-                      <span className="font-semibold block">Hashgraph HCS Root</span>
-                      <span className="text-[9.5px] opacity-70">Zero PII / Cryptographic Merkle only</span>
-                    </button>
-                  </div>
-                )}
               </div>
 
-              {/* S3 WORM & KMS Retention */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1 flex items-center gap-1">
-                    <Lock size={12} /> S3 WORM Compliance Mode
-                  </label>
-                  <select value={logRetentionPeriod} onChange={e => setLogRetentionPeriod(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-xs text-gray-100 bg-white/5 border border-white/10 outline-none">
-                    <option value="90-days" className="bg-[#141033]">90 Days Hot / 1 Year WORM</option>
-                    <option value="180-days" className="bg-[#141033]">180 Days Hot / 3 Years WORM (SOC 2)</option>
-                    <option value="365-days" className="bg-[#141033]">365 Days Hot / 7 Years WORM (FedRAMP)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1 flex items-center gap-1">
-                    <Zap size={12} /> SIEM / ITDR Ingestion
-                  </label>
-                  <select value={telemetryMode} onChange={e => setTelemetryMode(e.target.value as 'webhook' | 'apikey')}
-                    className="w-full px-3 py-2 rounded-lg text-xs text-gray-100 bg-white/5 border border-white/10 outline-none">
-                    <option value="webhook" className="bg-[#141033]">Real-Time Webhook (HMAC-SHA256)</option>
-                    <option value="apikey" className="bg-[#141033]">REST API Pull (SIEM / EDR Keys)</option>
-                  </select>
-                </div>
+              {/* S3 WORM Compliance Tier */}
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1 flex items-center gap-1">
+                  <Lock size={12} /> S3 WORM Compliance Mode Retention
+                </label>
+                <select value={logRetentionPeriod} onChange={e => setLogRetentionPeriod(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-xs text-gray-100 bg-white/5 border border-white/10 outline-none">
+                  <option value="90-days" className="bg-[#141033]">90 Days Hot / 1 Year WORM</option>
+                  <option value="180-days" className="bg-[#141033]">180 Days Hot / 3 Years WORM (SOC 2 Type II)</option>
+                  <option value="365-days" className="bg-[#141033]">365 Days Hot / 7 Years WORM (FedRAMP / Banking)</option>
+                </select>
               </div>
 
               <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/5">
@@ -490,11 +616,11 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 6 · Provisioning ── */}
+          {/* ── 7 · Provisioning Pipeline Screen ── */}
           {step === STEP_PROVISION && (
             <div className="py-4">
               <h2 className="text-lg font-bold text-white mb-1">Deploying Sovereign Zero Trust Posture…</h2>
-              <p className="text-sm text-gray-500 mb-5">Binding sovereign enclave VPCs, private Hiero nodes, and adaptive risk gates.</p>
+              <p className="text-sm text-gray-500 mb-5">Binding IdP connectors, sovereign AWS VPCs, and in-country aBFT consensus.</p>
               <div className="space-y-2.5 max-w-md mx-auto">
                 {provisionTasks.map((taskText, i) => {
                   const done = i < provisionIdx;
@@ -514,16 +640,16 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 7 · Completion ── */}
+          {/* ── 8 · Completed & Ready Screen ── */}
           {step === STEP_DONE && (
             <div className="text-center py-6">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 border"
                 style={{ background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.3)' }}>
                 <Check size={32} className="text-green-400" />
               </div>
-              <h1 className="text-2xl font-bold text-white mb-2">Sovereign Architecture Online</h1>
+              <h1 className="text-2xl font-bold text-white mb-2">Sovereign Posture Successfully Applied</h1>
               <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-                {selectedFrameworks.length} Frameworks Active · {sanctionedApps.length} Apps Governed · Predictive QoE Online ·
+                {selectedFrameworks.length} Frameworks Active · {IDP_PROVIDERS.find(i => i.id === selectedIdp)?.name} Bound · {sanctionedApps.length} Apps Governed · Predictive QoE Online ·
                 {' '}{SOVEREIGN_CELL_REGIONS.find(r => r.id === sovereignRegion)?.name} Enclave Isolated · Private Hiero aBFT Ledger Locked.
               </p>
               <button onClick={finish}
