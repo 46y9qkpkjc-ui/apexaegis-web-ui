@@ -87,13 +87,6 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/telemetry', icon: Bot, label: 'AI Narrative Stream' },
       { href: '/logs', icon: FileText, label: 'Unified Event Ledger' },
-      { href: '/risk-decisions', icon: Brain, label: 'Risk Decisions' },
-      { href: '/ai-events', icon: Activity, label: 'AI/Agentic Events' },
-      { href: '/endpoint-events', icon: MonitorSmartphone, label: 'Endpoint Events' },
-      { href: '/network-events', icon: Wifi, label: 'Network Events' },
-      { href: '/isolated-events', icon: ShieldOff, label: 'Isolation Events' },
-      { href: '/logs/endpoint-dlp', icon: ShieldAlert, label: 'Endpoint DLP', premium: true },
-      { href: '/logs/transit-dlp', icon: Network, label: 'Transit DLP', premium: true },
     ],
   },
   {
@@ -107,13 +100,12 @@ const navGroups: NavGroup[] = [
     label: 'Causal Forensics & Remediation',
     items: [
       { href: '/forensics', icon: Search, label: 'Forensic & Remediation Hub' },
-      { href: '/operations/ledger', icon: Database, label: 'Ledger & State Rollback' },
     ],
   },
   {
-    label: 'Break-Glass & Approvals',
+    label: 'Break-Glass & State Rollback',
     items: [
-      { href: '/approvals', icon: ShieldCheck, label: 'Ephemeral Overrides' },
+      { href: '/operations', icon: RotateCw, label: 'Rollback & Overrides' },
       { href: '/admin/rbac', icon: UserCog, label: 'RBAC / Roles' },
       { href: '/admin/admin-users', icon: Users, label: 'Admin Users' },
     ],

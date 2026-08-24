@@ -1,251 +1,317 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Globe, Server, Shield, Lock, MapPin, Radio, CheckCircle,
+  AlertTriangle, Activity, Database, Wifi, Key
+} from 'lucide-react';
 
-interface SovereignCell {
+// Types
+interface SovereignEnclave {
   id: string;
   region: string;
   regionCode: string;
   provider: string;
-  status: 'healthy' | 'degraded' | 'offline';
-  vpcHealth: string;
-  privateLink: string;
-  kmsStatus: string;
-  hsmStatus: string;
-  position: { x: number; y: number };
+  vpcStatus: 'healthy' | 'degraded' | 'down';
+  privateLinkStatus: 'active' | 'inactive' | 'error';
+  kmsStatus: 'active' | 'inactive';
+  cloudHSM: boolean;
+  activeConnections: number;
+  latencyMs: number;
 }
 
-const SOVEREIGN_CELLS: SovereignCell[] = [
-  { id: 'cell-in-01', region: 'India (Mumbai)', regionCode: 'ap-south-1', provider: 'AWS', status: 'healthy', vpcHealth: 'Healthy', privateLink: 'Connected', kmsStatus: 'Active', hsmStatus: 'CloudHSM', position: { x: 68, y: 52 } },
-  { id: 'cell-eu-01', region: 'EU (Frankfurt)', regionCode: 'eu-central-1', provider: 'AWS', status: 'healthy', vpcHealth: 'Healthy', privateLink: 'Connected', kmsStatus: 'Active', hsmStatus: 'CloudHSM', position: { x: 48, y: 38 } },
-  { id: 'cell-us-01', region: 'US GovCloud', regionCode: 'us-gov-west-1', provider: 'AWS', status: 'healthy', vpcHealth: 'Healthy', privateLink: 'Connected', kmsStatus: 'Active', hsmStatus: 'CloudHSM', position: { x: 22, y: 40 } },
-  { id: 'cell-sg-01', region: 'Singapore', regionCode: 'ap-southeast-1', provider: 'AWS', status: 'healthy', vpcHealth: 'Healthy', privateLink: 'Connected', kmsStatus: 'Active', hsmStatus: 'CloudHSM', position: { x: 76, y: 58 } },
-  { id: 'cell-au-01', region: 'Australia (Sydney)', regionCode: 'ap-southeast-2', provider: 'AWS', status: 'degraded', vpcHealth: 'Degraded', privateLink: 'Reconnecting', kmsStatus: 'Active', hsmStatus: 'CloudHSM', position: { x: 82, y: 72 } },
-  { id: 'cell-ae-01', region: 'UAE (Bahrain)', regionCode: 'me-south-1', provider: 'AWS', status: 'healthy', vpcHealth: 'Healthy', privateLink: 'Connected', kmsStatus: 'Active', hsmStatus: 'CloudHSM', position: { x: 58, y: 48 } },
-];
-
-interface GeofenceMode {
-  mode: 'strict' | 'network' | 'permissive';
-  violations: number;
-  lastViolation: string;
+interface GeofencingMode {
+  mode: 'strict_hardware' | 'network_path' | 'permissive_geoip';
+  enabled: boolean;
+  violationCount: number;
+  lastViolation?: string;
 }
 
-const GEOFENCE: GeofenceMode = {
-  mode: 'strict',
-  violations: 3,
-  lastViolation: '2024-01-15T14:22:00Z',
-};
-
-interface ConsensusNode {
+interface HieroNode {
   id: string;
-  region: string;
+  name: string;
   status: 'active' | 'syncing' | 'offline';
-  lastConsensus: string;
+  consensusTimestamp: string;
   merkleRoot: string;
-  chainHeight: number;
+  blocksSynced: number;
+  totalBlocks: number;
 }
-
-const CONSENSUS_NODES: ConsensusNode[] = [
-  { id: 'node-in-01', region: 'India', status: 'active', lastConsensus: '2024-01-15T14:32:15Z', merkleRoot: '0x8f2a...3c1d', chainHeight: 12847291 },
-  { id: 'node-eu-01', region: 'EU', status: 'active', lastConsensus: '2024-01-15T14:32:12Z', merkleRoot: '0x4b7e...9f2a', chainHeight: 12847290 },
-  { id: 'node-us-01', region: 'US GovCloud', status: 'active', lastConsensus: '2024-01-15T14:32:10Z', merkleRoot: '0x1c3d...5e8b', chainHeight: 12847289 },
-];
 
 interface WORMCompliance {
-  lockedRecords: number;
-  lastLockTime: string;
-  verifiableHashes: number;
-  complianceMode: string;
+  mode: 'compliant' | 'non_compliant' | 'pending';
+  lockedObjects: number;
+  lastVerification: string;
+  hashLookups: number;
 }
 
+// Mock data
+const ENCLAVES: SovereignEnclave[] = [
+  {
+    id: 'env_001',
+    region: 'India (Mumbai)',
+    regionCode: 'ap-south-1',
+    provider: 'AWS',
+    vpcStatus: 'healthy',
+    privateLinkStatus: 'active',
+    kmsStatus: 'active',
+    cloudHSM: true,
+    activeConnections: 1247,
+    latencyMs: 12,
+  },
+  {
+    id: 'env_002',
+    region: 'EU (Frankfurt)',
+    regionCode: 'eu-central-1',
+    provider: 'AWS',
+    vpcStatus: 'healthy',
+    privateLinkStatus: 'active',
+    kmsStatus: 'active',
+    cloudHSM: true,
+    activeConnections: 2103,
+    latencyMs: 18,
+  },
+  {
+    id: 'env_003',
+    region: 'US GovCloud',
+    regionCode: 'us-gov-west-1',
+    provider: 'AWS',
+    vpcStatus: 'healthy',
+    privateLinkStatus: 'active',
+    kmsStatus: 'active',
+    cloudHSM: true,
+    activeConnections: 892,
+    latencyMs: 24,
+  },
+  {
+    id: 'env_004',
+    region: 'Singapore',
+    regionCode: 'ap-southeast-1',
+    provider: 'AWS',
+    vpcStatus: 'degraded',
+    privateLinkStatus: 'active',
+    kmsStatus: 'active',
+    cloudHSM: false,
+    activeConnections: 456,
+    latencyMs: 15,
+  },
+];
+
+const GEOFENCING: GeofencingMode[] = [
+  { mode: 'strict_hardware', enabled: true, violationCount: 3, lastViolation: new Date(Date.now() - 3600000).toISOString() },
+  { mode: 'network_path', enabled: true, violationCount: 12, lastViolation: new Date(Date.now() - 1800000).toISOString() },
+  { mode: 'permissive_geoip', enabled: false, violationCount: 0 },
+];
+
+const HIERO_NODES: HieroNode[] = [
+  { id: 'node_001', name: 'hiero-validator-01.ap-south-1', status: 'active', consensusTimestamp: new Date(Date.now() - 5000).toISOString(), merkleRoot: '0x8f92a1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2', blocksSynced: 1847291, totalBlocks: 1847291 },
+  { id: 'node_002', name: 'hiero-validator-02.ap-south-1', status: 'active', consensusTimestamp: new Date(Date.now() - 5200).toISOString(), merkleRoot: '0x8f92a1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2', blocksSynced: 1847291, totalBlocks: 1847291 },
+  { id: 'node_003', name: 'hiero-validator-01.eu-central-1', status: 'syncing', consensusTimestamp: new Date(Date.now() - 12000).toISOString(), merkleRoot: '0x7e3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b', blocksSynced: 1847285, totalBlocks: 1847291 },
+];
+
 const WORM: WORMCompliance = {
-  lockedRecords: 847291,
-  lastLockTime: '2024-01-15T14:32:18Z',
-  verifiableHashes: 847291,
-  complianceMode: 'SOC 2 / NIST / ISO 27001',
+  mode: 'compliant',
+  lockedObjects: 2847291,
+  lastVerification: new Date(Date.now() - 300000).toISOString(),
+  hashLookups: 12847,
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  'healthy': 'bg-green-500/20 text-green-400',
-  'degraded': 'bg-amber-500/20 text-amber-400',
-  'offline': 'bg-red-500/20 text-red-400',
-  'active': 'bg-green-500/20 text-green-400',
-  'syncing': 'bg-cyan-500/20 text-cyan-400',
+const STATUS_CONFIG = {
+  healthy: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+  degraded: { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
+  down: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+  active: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+  inactive: { color: 'text-gray-400', bg: 'bg-white/5', border: 'border-white/10' },
+  error: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+  syncing: { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
+  offline: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+  compliant: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+  non_compliant: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+  pending: { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
 };
 
 export default function SovereigntyPage() {
-  const [selectedCell, setSelectedCell] = useState<SovereignCell | null>(null);
-  const [geofenceMode, setGeofenceMode] = useState<'strict' | 'network' | 'permissive'>(GEOFENCE.mode);
+  const [enclaves, setEnclaves] = useState(ENCLAVES);
+  const [selectedEnclave, setSelectedEnclave] = useState<SovereignEnclave | null>(ENCLAVES[0]);
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
+    <div className="space-y-4">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Sovereign Cells & DLT Audit</h1>
-        <p className="text-sm text-gray-400 mt-1">
+        <h1 className="text-xl font-bold text-gray-100">Sovereign Cells & DLT Audit</h1>
+        <p className="text-xs text-gray-400 mt-1">
           Real-time visibility and configuration of in-country enclaves, path controls, and immutable distributed ledger health.
         </p>
       </div>
 
-      {/* Sovereign Cell Enclave Grid */}
-      <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-gray-100 mb-4">Sovereign Cell Enclave Grid</h2>
-        <p className="text-sm text-gray-400 mb-4">
-          Active regional AWS enclaves with in-country VPC health, PrivateLink status, and local AWS KMS/CloudHSM key boundaries.
-        </p>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Map View */}
-          <div className="relative bg-gray-800/30 rounded-lg p-4 min-h-[300px]">
-            <svg viewBox="0 0 100 80" className="w-full h-full">
-              <rect x="0" y="0" width="100" height="80" fill="rgba(124,92,255,0.02)" rx="4" />
-              {SOVEREIGN_CELLS.map((cell) => {
-                const statusColor = cell.status === 'healthy' ? '#22c55e' : cell.status === 'degraded' ? '#f59e0b' : '#ef4444';
-                const isSelected = selectedCell?.id === cell.id;
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Enclave Grid */}
+        <div className="lg:col-span-2">
+          <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Globe size={12} className="text-cyan-400" /> Sovereign Cell Enclave Grid
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              {enclaves.map((enclave) => {
+                const vpcStyle = STATUS_CONFIG[enclave.vpcStatus];
+                const isSelected = selectedEnclave?.id === enclave.id;
                 return (
-                  <g key={cell.id} onClick={() => setSelectedCell(cell)} className="cursor-pointer">
-                    <circle
-                      cx={cell.position.x}
-                      cy={cell.position.y}
-                      r={isSelected ? 3 : 2}
-                      fill={statusColor}
-                      stroke={isSelected ? '#fff' : 'transparent'}
-                      strokeWidth={0.5}
-                    />
-                    <text
-                      x={cell.position.x}
-                      y={cell.position.y - 4}
-                      textAnchor="middle"
-                      fill={statusColor}
-                      fontSize={2}
-                      fontWeight={isSelected ? 700 : 500}
-                    >
-                      {cell.regionCode}
-                    </text>
-                  </g>
+                  <div
+                    key={enclave.id}
+                    onClick={() => setSelectedEnclave(enclave)}
+                    className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-cyan-500/50 bg-cyan-500/5'
+                        : 'border-gray-800 hover:border-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="text-xs font-medium text-white">{enclave.region}</div>
+                        <div className="text-[10px] text-gray-500 font-mono">{enclave.regionCode}</div>
+                      </div>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] border ${vpcStyle.bg} ${vpcStyle.border} ${vpcStyle.color}`}>
+                        {enclave.vpcStatus}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                      <div className="flex items-center gap-1">
+                        <Link size={8} className={enclave.privateLinkStatus === 'active' ? 'text-emerald-400' : 'text-gray-500'} />
+                        <span className="text-gray-400">PrivateLink</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Key size={8} className={enclave.kmsStatus === 'active' ? 'text-emerald-400' : 'text-gray-500'} />
+                        <span className="text-gray-400">KMS</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Server size={8} className="text-gray-400" />
+                        <span className="text-gray-400">{enclave.activeConnections}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Wifi size={8} className="text-gray-400" />
+                        <span className="text-gray-400">{enclave.latencyMs}ms</span>
+                      </div>
+                    </div>
+                    {enclave.cloudHSM && (
+                      <div className="mt-2 text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 inline-block">
+                        CloudHSM
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Panel */}
+        <div className="space-y-4">
+          {/* Geofencing Status */}
+          <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <MapPin size={12} className="text-amber-400" /> Hardware Geofencing
+            </h3>
+            <div className="space-y-2">
+              {GEOFENCING.map((gf) => {
+                const modeLabel = gf.mode === 'strict_hardware' ? 'Strict Hardware (GPS + Wi-Fi + BGP)' :
+                                  gf.mode === 'network_path' ? 'Network Path' : 'Permissive Geo-IP';
+                return (
+                  <div key={gf.mode} className="p-2 rounded-lg bg-white/5 border border-white/10">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-gray-300">{modeLabel}</span>
+                      <span className={`text-[10px] ${gf.enabled ? 'text-emerald-400' : 'text-gray-500'}`}>
+                        {gf.enabled ? 'Active' : 'Disabled'}
+                      </span>
+                    </div>
+                    {gf.enabled && (
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-gray-500">Violations</span>
+                        <span className={`font-mono ${gf.violationCount > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {gf.violationCount}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Cell Cards */}
-          <div className="grid grid-cols-2 gap-3">
-            {SOVEREIGN_CELLS.map((cell) => (
-              <div
-                key={cell.id}
-                onClick={() => setSelectedCell(cell)}
-                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                  selectedCell?.id === cell.id
-                    ? 'border-cyan-500/50 bg-cyan-500/5'
-                    : 'border-gray-700/50 bg-gray-800/30 hover:border-gray-600/50'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-200">{cell.region}</span>
-                  <span className={`px-2 py-0.5 rounded text-xs ${STATUS_COLORS[cell.status]}`}>
-                    {cell.status}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 space-y-1">
-                  <div>VPC: <span className="text-gray-400">{cell.vpcHealth}</span></div>
-                  <div>PrivateLink: <span className="text-gray-400">{cell.privateLink}</span></div>
-                  <div>KMS: <span className="text-gray-400">{cell.kmsStatus}</span></div>
-                </div>
+          {/* WORM Compliance */}
+          <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Lock size={12} className="text-purple-400" /> S3 WORM Compliance
+            </h3>
+            <div className="space-y-2 text-[10px]">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Mode</span>
+                <span className={`px-1.5 py-0.5 rounded border ${STATUS_CONFIG[WORM.mode].bg} ${STATUS_CONFIG[WORM.mode].border} ${STATUS_CONFIG[WORM.mode].color}`}>
+                  {WORM.mode}
+                </span>
               </div>
-            ))}
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Locked Objects</span>
+                <span className="text-white font-mono">{WORM.lockedObjects.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Hash Lookups</span>
+                <span className="text-white font-mono">{WORM.hashLookups.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Last Verification</span>
+                <span className="text-gray-300">{new Date(WORM.lastVerification).toLocaleTimeString()}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Hardware & Geocoding Boundary Status */}
-      <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-gray-100 mb-4">Hardware & Geocoding Boundary Status</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Active Geofencing Mode</label>
-            <select
-              value={geofenceMode}
-              onChange={(e) => setGeofenceMode(e.target.value as typeof geofenceMode)}
-              className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700/50 text-gray-200 text-sm"
-            >
-              <option value="strict">Strict Hardware (GPS + Wi-Fi BSSID + BGP ASN)</option>
-              <option value="network">Network Path</option>
-              <option value="permissive">Permissive Geo-IP</option>
-            </select>
-          </div>
-          <div className="p-4 rounded-lg bg-gray-800/30">
-            <div className="text-sm text-gray-500 mb-1">Violation Counter</div>
-            <div className="text-2xl font-bold text-red-400">{GEOFENCE.violations}</div>
-            <div className="text-xs text-gray-500">Out-of-jurisdiction attempts</div>
-          </div>
-          <div className="p-4 rounded-lg bg-gray-800/30">
-            <div className="text-sm text-gray-500 mb-1">Last Violation</div>
-            <div className="text-sm text-gray-300">{new Date(GEOFENCE.lastViolation).toLocaleString()}</div>
-            <div className="text-xs text-gray-500">2 hours ago</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Private Hiero aBFT Consensus Node Health */}
-      <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-gray-100 mb-4">Private Hiero aBFT Consensus Node Health</h2>
-        <p className="text-sm text-gray-400 mb-4">
-          Local validator node status, consensus timestamp generation, and running Merkle root stream.
-        </p>
+      {/* Hiero Consensus Nodes */}
+      <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <Database size={12} className="text-indigo-400" /> Private Hiero aBFT Consensus Nodes
+        </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-[10px]">
             <thead>
-              <tr className="border-b border-gray-700/50">
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Node ID</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Region</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Last Consensus</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Merkle Root</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Chain Height</th>
+              <tr className="text-gray-500 border-b border-gray-800">
+                <th className="text-left font-medium px-3 py-2">Node</th>
+                <th className="text-left font-medium px-3 py-2">Status</th>
+                <th className="text-left font-medium px-3 py-2">Last Consensus</th>
+                <th className="text-left font-medium px-3 py-2">Merkle Root</th>
+                <th className="text-right font-medium px-3 py-2">Blocks</th>
               </tr>
             </thead>
             <tbody>
-              {CONSENSUS_NODES.map((node) => (
-                <tr key={node.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                  <td className="py-3 px-4 font-mono text-gray-300">{node.id}</td>
-                  <td className="py-3 px-4 text-gray-300">{node.region}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded text-xs ${STATUS_COLORS[node.status]}`}>
-                      {node.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-gray-400">{new Date(node.lastConsensus).toLocaleTimeString()}</td>
-                  <td className="py-3 px-4 font-mono text-cyan-400">{node.merkleRoot}</td>
-                  <td className="py-3 px-4 font-mono text-gray-300">{node.chainHeight.toLocaleString()}</td>
-                </tr>
-              ))}
+              {HIERO_NODES.map((node) => {
+                const style = STATUS_CONFIG[node.status];
+                return (
+                  <tr key={node.id} className="border-b border-gray-800/50">
+                    <td className="px-3 py-2 font-mono text-gray-300">{node.name}</td>
+                    <td className="px-3 py-2">
+                      <span className={`px-1.5 py-0.5 rounded border ${style.bg} ${style.border} ${style.color}`}>
+                        {node.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-gray-400">{new Date(node.consensusTimestamp).toLocaleTimeString()}</td>
+                    <td className="px-3 py-2 font-mono text-gray-400 truncate max-w-[200px]">{node.merkleRoot}</td>
+                    <td className="px-3 py-2 text-right font-mono text-gray-300">{node.blocksSynced.toLocaleString()}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* S3 WORM Compliance Mode */}
-      <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-gray-100 mb-4">S3 WORM Compliance Mode</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-4 rounded-lg bg-gray-800/30">
-            <div className="text-sm text-gray-500 mb-1">Locked Records</div>
-            <div className="text-2xl font-bold text-cyan-400">{WORM.lockedRecords.toLocaleString()}</div>
-          </div>
-          <div className="p-4 rounded-lg bg-gray-800/30">
-            <div className="text-sm text-gray-500 mb-1">Last Lock Time</div>
-            <div className="text-sm text-gray-300">{new Date(WORM.lastLockTime).toLocaleTimeString()}</div>
-          </div>
-          <div className="p-4 rounded-lg bg-gray-800/30">
-            <div className="text-sm text-gray-500 mb-1">Verifiable Hashes</div>
-            <div className="text-2xl font-bold text-green-400">{WORM.verifiableHashes.toLocaleString()}</div>
-          </div>
-          <div className="p-4 rounded-lg bg-gray-800/30">
-            <div className="text-sm text-gray-500 mb-1">Compliance Mode</div>
-            <div className="text-sm text-gray-300">{WORM.complianceMode}</div>
-          </div>
-        </div>
-      </div>
     </div>
+  );
+}
+
+function Link(props: { size: number; className?: string }) {
+  return (
+    <svg width={props.size} height={props.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
   );
 }

@@ -4,19 +4,22 @@
  * ApexAegis First-Time Setup Wizard
  * Configures:
  * 1. Governance & Regulatory Frameworks
- * 2. Identity Provider (IdP) Onboarding & Directory Sync (Entra, Okta, Ping, Google)
- * 3. 0-100 Continuous Adaptive Trust & Dynamic Enforcement
- * 4. Top Sanctioned SaaS & Agentic AI App Catalog
- * 5. Predictive QoE & Local Physical NIC Optimization
- * 6. Third-Party Telemetry, ITDR Ingestion & Sovereign Micro-Cells (In-Country Hiero DLT)
+ * 2. IdP Onboarding & SCIM Directory Sync (Entra, Okta, Ping, Google)
+ * 3. Autonomous AI vs. Human Disambiguation & RCE Defense
+ * 4. Software Supply Chain & LLM Discrepancy Quarantine Sandbox
+ * 5. 0-100 Continuous Adaptive Trust & Dynamic Enforcement
+ * 6. Top Sanctioned SaaS & Agentic AI App Catalog
+ * 7. Predictive QoE & Local Physical NIC Optimization
+ * 8. Sovereign Micro-Cells, ITDR Ingestion & Private In-Country Hiero aBFT Ledger
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import {
+  type LucideIcon,
   ShieldCheck, ArrowRight, ArrowLeft, Check, Loader2, Sparkles,
   Landmark, Globe2, CreditCard, HeartPulse, Building2, ListChecks, X,
   Activity, Sliders, Database, Network, Zap, MapPin, Lock, Server, Cpu,
-  Fingerprint, Key, FileText, Download, ExternalLink, HelpCircle
+  Fingerprint, FileText, Download, Bot, Box, ShieldAlert
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
 
@@ -28,16 +31,20 @@ const COMPLETED_KEY = 'aa_governance_completed';
 const STEP_WELCOME = 0;
 const STEP_FRAMEWORKS = 1;
 const STEP_IDP_ONBOARDING = 2;
-const STEP_RISK_TAXONOMY = 3;
-const STEP_APPS_DISCOVERY = 4;
-const STEP_QOE_NIC = 5;
-const STEP_SOVEREIGN_CELL = 6;
-const STEP_PROVISION = 7;
-const STEP_DONE = 8;
+const STEP_AGENTIC_DEFENSE = 3;
+const STEP_SUPPLY_CHAIN_SANDBOX = 4;
+const STEP_RISK_TAXONOMY = 5;
+const STEP_APPS_DISCOVERY = 6;
+const STEP_QOE_NIC = 7;
+const STEP_SOVEREIGN_CELL = 8;
+const STEP_PROVISION = 9;
+const STEP_DONE = 10;
 
 const CONFIG_STEPS = [
   STEP_FRAMEWORKS,
   STEP_IDP_ONBOARDING,
+  STEP_AGENTIC_DEFENSE,
+  STEP_SUPPLY_CHAIN_SANDBOX,
   STEP_RISK_TAXONOMY,
   STEP_APPS_DISCOVERY,
   STEP_QOE_NIC,
@@ -48,7 +55,7 @@ interface Framework {
   id: string;
   name: string;
   desc: string;
-  icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
+  icon: LucideIcon;
 }
 
 const FRAMEWORKS: Framework[] = [
@@ -63,10 +70,10 @@ const FRAMEWORKS: Framework[] = [
 ];
 
 const IDP_PROVIDERS = [
-  { id: 'entra', name: 'Microsoft Entra ID (Azure AD)', desc: 'OIDC / SAML 2.0 + SCIM 2.0 Graph API Sync', guideKey: 'entra-id-guide' },
-  { id: 'okta',  name: 'Okta Identity Cloud',          desc: 'Universal Directory + Push SCIM Groups',       guideKey: 'okta-guide' },
-  { id: 'ping',  name: 'PingFederate / PingOne',       desc: 'Enterprise SAML 2.0 Bridge & NHI Scopes',    guideKey: 'ping-guide' },
-  { id: 'google',name: 'Google Workspace',             desc: 'Secure Web Identity & Workspace Directory',    guideKey: 'google-guide' },
+  { id: 'entra', name: 'Microsoft Entra ID (Azure AD)', desc: 'OIDC / SAML 2.0 + SCIM 2.0 Graph API Sync' },
+  { id: 'okta',  name: 'Okta Identity Cloud',          desc: 'Universal Directory + Push SCIM Groups' },
+  { id: 'ping',  name: 'PingFederate / PingOne',       desc: 'Enterprise SAML 2.0 Bridge & NHI Scopes' },
+  { id: 'google',name: 'Google Workspace',             desc: 'Secure Web Identity & Workspace Directory' },
 ];
 
 const SANCTIONED_PRESETS = [
@@ -83,10 +90,10 @@ const SOVEREIGN_CELL_REGIONS = [
 ];
 
 const TELEMETRY_PARTNERS = [
-  { id: 'crowdstrike', name: 'CrowdStrike Falcon', type: 'EDR / ITDR Webhook', doc: 'CrowdStrike_FDR_Ingest.pdf' },
-  { id: 'defender',    name: 'Microsoft Defender XDR', type: 'Graph Security API', doc: 'Defender_XDR_Setup.pdf' },
-  { id: 'sentinelone', name: 'SentinelOne Singularity', type: 'Cloud-to-Cloud API', doc: 'SentinelOne_Deep_Visibility.pdf' },
-  { id: 'splunk',      name: 'Splunk / HEC Streaming', type: 'HTTP Event Collector', doc: 'Splunk_HEC_Integration.pdf' },
+  { id: 'crowdstrike', name: 'CrowdStrike Falcon', type: 'EDR / ITDR Webhook' },
+  { id: 'defender',    name: 'Microsoft Defender XDR', type: 'Graph Security API' },
+  { id: 'sentinelone', name: 'SentinelOne Singularity', type: 'Cloud-to-Cloud API' },
+  { id: 'splunk',      name: 'Splunk / HEC Streaming', type: 'HTTP Event Collector' },
 ];
 
 export function FirstTimeSetup() {
@@ -95,33 +102,37 @@ export function FirstTimeSetup() {
   const [step, setStep] = useState(STEP_WELCOME);
   const [provisionIdx, setProvisionIdx] = useState(0);
 
-  // Posture States
+  // Core Configuration States
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>(['nist-800-53', 'iso-27001', 'soc2']);
-  
-  // IdP States
   const [selectedIdp, setSelectedIdp] = useState('entra');
   const [idpIssuerUrl, setIdpIssuerUrl] = useState('');
   const [idpClientId, setIdpClientId] = useState('');
   const [idpClientSecret, setIdpClientSecret] = useState('');
-  
-  // Risk & Apps
+
+  // Agentic AI vs Human States
+  const [agentIsolationMode, setAgentIsolationMode] = useState<'strict_rce_block' | 'adaptive_stepup' | 'monitor'>('strict_rce_block');
+  const [agentPromptDlp, setAgentPromptDlp] = useState(true);
+  const [agentTerminalGating, setAgentTerminalGating] = useState(true);
+
+  // Supply Chain & LLM Discrepancy States
+  const [sandboxQuarantineMode, setSandboxQuarantineMode] = useState<'llm_discrepancy' | 'strict_90_days' | 'hybrid_instant'>('llm_discrepancy');
+  const [quarantineObservationDays, setQuarantineObservationDays] = useState('90');
+
+  // Risk, SaaS & QoE
   const [riskSensitivity, setRiskSensitivity] = useState<'strict' | 'balanced' | 'adaptive'>('adaptive');
   const [sanctionedApps, setSanctionedApps] = useState<string[]>(['Microsoft 365', 'GitHub Enterprise', 'ChatGPT Enterprise', 'Slack Enterprise']);
   const [qoeOptimization, setQoeOptimization] = useState(true);
   const [nicBackoffThreshold, setNicBackoffThreshold] = useState('80');
-  
-  // Sovereignty, DLT & Telemetry States
+
+  // Sovereign & Ledger
   const [sovereignRegion, setSovereignRegion] = useState('in-ap-south-1');
   const [geofenceEnforcement, setGeofenceEnforcement] = useState<'strict_hw' | 'bgp_path' | 'permissive'>('strict_hw');
   const [enablePrivateHiero, setEnablePrivateHiero] = useState(true);
-  const [hieroConsensusMode, setHieroConsensusMode] = useState<'private_cluster' | 'public_anchor'>('private_cluster');
   const [logRetentionPeriod, setLogRetentionPeriod] = useState('180-days');
   const [selectedTelemetryPartner, setSelectedTelemetryPartner] = useState('crowdstrike');
-  const [telemetryMode, setTelemetryMode] = useState<'webhook' | 'apikey'>('webhook');
   const [webhookUrl] = useState('https://ingest.apexaegis.app/v1/telemetry/wh_live_9f82d018c');
   const [completedAt, setCompletedAt] = useState<string | null>(null);
 
-  // Load prior posture configuration
   const applyPersisted = useCallback(() => {
     try {
       const raw = localStorage.getItem(CONFIG_KEY);
@@ -131,6 +142,11 @@ export function FirstTimeSetup() {
         if (typeof c.selectedIdp === 'string') setSelectedIdp(c.selectedIdp);
         if (typeof c.idpIssuerUrl === 'string') setIdpIssuerUrl(c.idpIssuerUrl);
         if (typeof c.idpClientId === 'string') setIdpClientId(c.idpClientId);
+        if (typeof c.agentIsolationMode === 'string') setAgentIsolationMode(c.agentIsolationMode as 'strict_rce_block' | 'adaptive_stepup' | 'monitor');
+        if (typeof c.agentPromptDlp === 'boolean') setAgentPromptDlp(c.agentPromptDlp);
+        if (typeof c.agentTerminalGating === 'boolean') setAgentTerminalGating(c.agentTerminalGating);
+        if (typeof c.sandboxQuarantineMode === 'string') setSandboxQuarantineMode(c.sandboxQuarantineMode as 'llm_discrepancy' | 'strict_90_days' | 'hybrid_instant');
+        if (typeof c.quarantineObservationDays === 'string') setQuarantineObservationDays(c.quarantineObservationDays);
         if (typeof c.riskSensitivity === 'string') setRiskSensitivity(c.riskSensitivity as 'strict' | 'balanced' | 'adaptive');
         if (Array.isArray(c.sanctionedApps)) setSanctionedApps(c.sanctionedApps as string[]);
         if (typeof c.qoeOptimization === 'boolean') setQoeOptimization(c.qoeOptimization);
@@ -138,9 +154,7 @@ export function FirstTimeSetup() {
         if (typeof c.sovereignRegion === 'string') setSovereignRegion(c.sovereignRegion);
         if (typeof c.geofenceEnforcement === 'string') setGeofenceEnforcement(c.geofenceEnforcement as 'strict_hw' | 'bgp_path' | 'permissive');
         if (typeof c.enablePrivateHiero === 'boolean') setEnablePrivateHiero(c.enablePrivateHiero);
-        if (typeof c.hieroConsensusMode === 'string') setHieroConsensusMode(c.hieroConsensusMode as 'private_cluster' | 'public_anchor');
         if (typeof c.logRetentionPeriod === 'string') setLogRetentionPeriod(c.logRetentionPeriod);
-        if (typeof c.telemetryMode === 'string') setTelemetryMode(c.telemetryMode as 'webhook' | 'apikey');
       }
       const done = localStorage.getItem(COMPLETED_KEY);
       setCompletedAt(done);
@@ -161,15 +175,15 @@ export function FirstTimeSetup() {
     if (accessToken) openNow();
   }, [accessToken, openNow]);
 
-  // Provisioning steps pipeline
   const provisionTasks = [
     `Compiling ${selectedFrameworks.length} governance framework control policies`,
     `Binding IdP Connector (${IDP_PROVIDERS.find(i => i.id === selectedIdp)?.name}) & SCIM Directory`,
+    `Arming Autonomous Agent RCE Prevention & Shell Jail Engine (${agentIsolationMode})`,
+    `Deploying LLM Discrepancy Analysis & Supply Chain Sandbox (${quarantineObservationDays}-day gate)`,
     `Initializing Continuous Adaptive Trust engine (0-100 Sensitivity: ${riskSensitivity})`,
     `Governing ${sanctionedApps.length} sanctioned apps with NHI & OAuth boundaries`,
     `Configuring Predictive QoE NIC contention back-off (> ${nicBackoffThreshold}% utilization)`,
     `Isolating Sovereign Cell in ${SOVEREIGN_CELL_REGIONS.find(r => r.id === sovereignRegion)?.name}`,
-    `Activating Hardware/GPS Geocoded Routing Boundary (${geofenceEnforcement})`,
     `Deploying In-Country Private Hiero aBFT Nodes & S3 WORM (${logRetentionPeriod})`,
   ];
 
@@ -194,6 +208,11 @@ export function FirstTimeSetup() {
       selectedIdp,
       idpIssuerUrl,
       idpClientId,
+      agentIsolationMode,
+      agentPromptDlp,
+      agentTerminalGating,
+      sandboxQuarantineMode,
+      quarantineObservationDays,
       riskSensitivity,
       sanctionedApps,
       qoeOptimization,
@@ -201,9 +220,7 @@ export function FirstTimeSetup() {
       sovereignRegion,
       geofenceEnforcement,
       enablePrivateHiero,
-      hieroConsensusMode,
       logRetentionPeriod,
-      telemetryMode,
     };
     try {
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
@@ -217,7 +234,7 @@ export function FirstTimeSetup() {
   const configIdx = CONFIG_STEPS.indexOf(step);
   const firstName = (user?.name || user?.email || 'Admin').split(/[ @]/)[0];
 
-  const sectionHead = (Icon: typeof ShieldCheck, title: string, sub: string) => (
+  const sectionHead = (Icon: LucideIcon, title: string, sub: string) => (
     <div className="mb-4">
       <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
         <Icon size={18} style={{ color: ACCENT }} /> {title}
@@ -287,7 +304,7 @@ export function FirstTimeSetup() {
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">Welcome to ApexAegis, {firstName}.</h1>
               <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-                Initialize your Zero Trust posture: governance frameworks, IdP onboarding, 0–100 CATE risk engine, sanctioned SaaS/AI discovery, predictive QoE, and in-country sovereign ledger governance.
+                Initialize your Zero Trust posture: governance frameworks, IdP sync, Agentic AI vs. Human RCE isolation, software supply chain LLM discrepancy sandbox, predictive QoE, and in-country sovereign ledger governance.
               </p>
 
               {completedAt && (
@@ -346,12 +363,11 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 2 · Identity Provider (IdP) Onboarding & Directory Sync ── */}
+          {/* ── 2 · IdP Onboarding ── */}
           {step === STEP_IDP_ONBOARDING && (
             <div>
               {sectionHead(Fingerprint, 'Identity Provider (IdP) & SCIM Onboarding', 'Bind your enterprise identity provider for single sign-on, non-human identity (NHI) delegation, and directory sync.')}
               
-              {/* IdP Selector */}
               <div className="grid grid-cols-2 gap-2.5 mb-4">
                 {IDP_PROVIDERS.map(idp => {
                   const on = selectedIdp === idp.id;
@@ -369,12 +385,9 @@ export function FirstTimeSetup() {
                 })}
               </div>
 
-              {/* IdP Config Inputs */}
               <div className="space-y-3 bg-white/5 p-4 rounded-xl border border-white/10 mb-4">
                 <div>
-                  <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">
-                    IdP Issuer URL / Domain Endpoint
-                  </label>
+                  <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">IdP Issuer URL / Domain Endpoint</label>
                   <input
                     value={idpIssuerUrl}
                     onChange={e => setIdpIssuerUrl(e.target.value)}
@@ -382,14 +395,13 @@ export function FirstTimeSetup() {
                     className="w-full px-3.5 py-2 rounded-lg text-xs font-mono text-white bg-black/40 border border-white/10 outline-none"
                   />
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Application (Client) ID</label>
                     <input
                       value={idpClientId}
                       onChange={e => setIdpClientId(e.target.value)}
-                      placeholder="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+                      placeholder="client-app-id-guid"
                       className="w-full px-3.5 py-2 rounded-lg text-xs font-mono text-white bg-black/40 border border-white/10 outline-none"
                     />
                   </div>
@@ -406,7 +418,6 @@ export function FirstTimeSetup() {
                 </div>
               </div>
 
-              {/* PDF Guide Placeholder */}
               <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/[0.02]">
                 <div className="flex items-center gap-2 text-gray-300 text-xs">
                   <FileText size={14} style={{ color: ACCENT }} />
@@ -414,18 +425,149 @@ export function FirstTimeSetup() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert(`Downloading ApexAegis_${selectedIdp.toUpperCase()}_Integration_Guide.pdf placeholder`)}
+                  onClick={() => alert(`Downloading ApexAegis_${selectedIdp.toUpperCase()}_Integration_Guide.pdf`)}
                   className="inline-flex items-center gap-1.5 text-[11px] text-purple-300 hover:text-purple-200"
                 >
                   <Download size={12} /> Download PDF Guide
                 </button>
               </div>
 
-              {navRow(STEP_FRAMEWORKS, STEP_RISK_TAXONOMY, 'Continue to Risk Engine')}
+              {navRow(STEP_FRAMEWORKS, STEP_AGENTIC_DEFENSE, 'Continue to Agentic Defense')}
             </div>
           )}
 
-          {/* ── 3 · 0-100 Risk Engine & Dynamic Enforcement ── */}
+          {/* ── 3 · Autonomous AI vs Human & RCE Prevention ── */}
+          {step === STEP_AGENTIC_DEFENSE && (
+            <div>
+              {sectionHead(Bot, 'Autonomous AI Operation vs. Human Activity & RCE Defense', 'Classify non-human identity (NHI) telemetry, isolate autonomous agent sessions, and prevent Remote Code Execution (RCE) shell escapes.')}
+              
+              <div className="space-y-3 mb-5">
+                {[
+                  {
+                    id: 'strict_rce_block',
+                    name: 'Strict Jail & Deterministic RCE Blocking (Recommended)',
+                    desc: 'Differentiates AI agent tokens from interactive human keystrokes. Blocks child process spawning (bash/cmd), unapproved terminal execs, and direct socket calls from agentic workflows.'
+                  },
+                  {
+                    id: 'adaptive_stepup',
+                    name: 'Adaptive Agentic Step-Up & Dual Authorization',
+                    desc: 'Allows autonomous agents to perform routine read/query actions; mandates human FIDO2 cryptographic sign-off for mutating code changes, database writes, or outbound shell execution.'
+                  },
+                  {
+                    id: 'monitor',
+                    name: 'Audit & Behavioral Profiling Mode',
+                    desc: 'Continuously logs AI agent execution lineages and calculates discrepancy scores without enforcing real-time micro-isolation.'
+                  }
+                ].map(opt => {
+                  const on = agentIsolationMode === opt.id;
+                  return (
+                    <button key={opt.id} onClick={() => setAgentIsolationMode(opt.id as 'strict_rce_block' | 'adaptive_stepup' | 'monitor')}
+                      className="w-full flex items-start gap-3 px-4 py-3 rounded-xl border text-left transition-all"
+                      style={{ background: on ? 'rgba(109,74,255,0.1)' : 'rgba(255,255,255,0.02)', borderColor: on ? 'rgba(109,74,255,0.5)' : 'rgba(255,255,255,0.08)' }}>
+                      <span className="w-4 h-4 rounded-full border mt-1 flex items-center justify-center flex-shrink-0" style={{ borderColor: on ? ACCENT : 'rgba(255,255,255,0.25)' }}>
+                        {on && <span className="w-2 h-2 rounded-full" style={{ background: ACCENT }} />}
+                      </span>
+                      <span className="flex-1">
+                        <span className="block text-sm font-medium text-gray-100">{opt.name}</span>
+                        <span className="block text-[11.5px] text-gray-400 mt-0.5 leading-relaxed">{opt.desc}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-2.5 bg-white/5 p-3.5 rounded-xl border border-white/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="block text-xs font-medium text-gray-200">Terminal & Subprocess Gating</span>
+                    <span className="block text-[11px] text-gray-400">Jails autonomous coding assistants (Claude Code, Devin, Cursor) from executing unvetted local binaries.</span>
+                  </div>
+                  <input type="checkbox" checked={agentTerminalGating} onChange={e => setAgentTerminalGating(e.target.checked)} className="w-4 h-4 accent-purple-600" />
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                  <div>
+                    <span className="block text-xs font-medium text-gray-200">Non-Human Identity (NHI) Prompt DLP</span>
+                    <span className="block text-[11px] text-gray-400">Prevents agents from leaking API keys, private keys, or PII into public LLM context windows.</span>
+                  </div>
+                  <input type="checkbox" checked={agentPromptDlp} onChange={e => setAgentPromptDlp(e.target.checked)} className="w-4 h-4 accent-purple-600" />
+                </div>
+              </div>
+
+              {navRow(STEP_IDP_ONBOARDING, STEP_SUPPLY_CHAIN_SANDBOX, 'Continue to Supply Chain Sandbox')}
+            </div>
+          )}
+
+          {/* ── 4 · Software Supply Chain & LLM Discrepancy Sandbox ── */}
+          {step === STEP_SUPPLY_CHAIN_SANDBOX && (
+            <div>
+              {sectionHead(Box, 'Software Supply Chain & Package Governance', 'Prevent malicious open-source packages from dropping backdoors or unauthorized remote C2 channels. Sandbox unverified sources for observation or verify instantly with LLM Discrepancy Analysis.')}
+
+              <div className="space-y-3 mb-4">
+                {[
+                  {
+                    id: 'llm_discrepancy',
+                    name: 'Proprietary LLM Discrepancy Analysis (Instant Verification)',
+                    desc: 'Performs semantic intent-vs-code AST analysis, deobfuscating hidden payloads, constant propagation, and taint paths to clear clean packages in seconds without a long observation delay.'
+                  },
+                  {
+                    id: 'strict_90_days',
+                    name: 'Strict Zero-Trust Quarantine Sandbox',
+                    desc: 'Holds newly released npm, PyPI, and RubyGems packages from unidentified/untrusted maintainers in a sandboxed staging registry for a full observation cycle before developer release.'
+                  },
+                  {
+                    id: 'hybrid_instant',
+                    name: 'Hybrid: Observation Gate with Automated LLM Discrepancy Bypass',
+                    desc: 'Defaults to quarantine for zero-reputation packages; automatically releases packages that pass 100% LLM AST semantic verification and taint path lineage tests.'
+                  }
+                ].map(opt => {
+                  const on = sandboxQuarantineMode === opt.id;
+                  return (
+                    <button key={opt.id} onClick={() => setSandboxQuarantineMode(opt.id as 'llm_discrepancy' | 'strict_90_days' | 'hybrid_instant')}
+                      className="w-full flex items-start gap-3 px-4 py-3 rounded-xl border text-left transition-all"
+                      style={{ background: on ? 'rgba(109,74,255,0.1)' : 'rgba(255,255,255,0.02)', borderColor: on ? 'rgba(109,74,255,0.5)' : 'rgba(255,255,255,0.08)' }}>
+                      <span className="w-4 h-4 rounded-full border mt-1 flex items-center justify-center flex-shrink-0" style={{ borderColor: on ? ACCENT : 'rgba(255,255,255,0.25)' }}>
+                        {on && <span className="w-2 h-2 rounded-full" style={{ background: ACCENT }} />}
+                      </span>
+                      <span className="flex-1">
+                        <span className="block text-sm font-medium text-gray-100">{opt.name}</span>
+                        <span className="block text-[11.5px] text-gray-400 mt-0.5 leading-relaxed">{opt.desc}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert size={16} className="text-purple-400" />
+                    <div>
+                      <span className="block text-xs font-medium text-gray-100">AST Control-Flow Tracing & Semantic Verification</span>
+                      <span className="block text-[10.5px] text-gray-400">Flags execution lineages that diverge from declared package manifests across npm, PyPI, and Go modules.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                  <span className="text-xs text-gray-300">Unidentified Source Observation Window</span>
+                  <select
+                    value={quarantineObservationDays}
+                    onChange={e => setQuarantineObservationDays(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-gray-200 bg-[#141033] border border-white/10 outline-none"
+                  >
+                    <option value="30">30 Days Observation</option>
+                    <option value="60">60 Days Observation</option>
+                    <option value="90">90 Days Observation (Recommended)</option>
+                    <option value="180">180 Days (High-Assurance Banking)</option>
+                  </select>
+                </div>
+              </div>
+
+              {navRow(STEP_AGENTIC_DEFENSE, STEP_RISK_TAXONOMY, 'Continue to Risk Engine')}
+            </div>
+          )}
+
+          {/* ── 5 · Risk Engine & Dynamic Enforcement ── */}
           {step === STEP_RISK_TAXONOMY && (
             <div>
               {sectionHead(Activity, '0–100 Risk Engine & Dynamic Enforcement', 'Define how continuous telemetry (EDR, travel velocity, agentic context) triggers automated mid-session controls.')}
@@ -451,11 +593,11 @@ export function FirstTimeSetup() {
                   );
                 })}
               </div>
-              {navRow(STEP_IDP_ONBOARDING, STEP_APPS_DISCOVERY, 'Continue')}
+              {navRow(STEP_SUPPLY_CHAIN_SANDBOX, STEP_APPS_DISCOVERY, 'Continue')}
             </div>
           )}
 
-          {/* ── 4 · Sanctioned SaaS & AI Discovery ── */}
+          {/* ── 6 · Sanctioned Apps Catalog ── */}
           {step === STEP_APPS_DISCOVERY && (
             <div>
               {sectionHead(Sliders, 'Sanctioned SaaS & Agentic AI Catalog', 'Approve corporate SaaS and AI platforms. Enforces tenant-isolation, prompt DLP, and non-human identity (NHI) token governance.')}
@@ -479,7 +621,7 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 5 · Predictive QoE & NIC Optimization ── */}
+          {/* ── 7 · Predictive QoE & NIC Optimization ── */}
           {step === STEP_QOE_NIC && (
             <div>
               {sectionHead(Network, 'Predictive QoE & Physical NIC Optimization', 'Prioritize Teams, Zoom, and WebEx by dynamically throttling noisy background processes across both steered and bypassed flows.')}
@@ -511,12 +653,11 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 6 · Sovereign Micro-Cells, ITDR Guides & Distributed Ledger ── */}
+          {/* ── 8 · Sovereignty, ITDR & Ledger ── */}
           {step === STEP_SOVEREIGN_CELL && (
             <div>
               {sectionHead(Database, 'Sovereignty, ITDR Ingestion & Immutable Ledger', 'Configure in-country enclave boundaries, telemetry streaming guides, and private Hiero aBFT state verification.')}
 
-              {/* In-Country Enclave Selection */}
               <div className="mb-4">
                 <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1.5 flex items-center gap-1.5">
                   <Server size={13} /> Sovereign Enclave Region (AWS Private VPC)
@@ -541,7 +682,6 @@ export function FirstTimeSetup() {
                 </div>
               </div>
 
-              {/* Third-Party Telemetry & ITDR Partner Ingestion */}
               <div className="p-3.5 rounded-xl border border-white/10 bg-white/5 mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[11px] uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
@@ -576,7 +716,6 @@ export function FirstTimeSetup() {
                 </div>
               </div>
 
-              {/* In-Country Hiero Distributed Ledger */}
               <div className="p-3.5 rounded-xl border border-white/10 bg-white/5 mb-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -590,7 +729,6 @@ export function FirstTimeSetup() {
                 </div>
               </div>
 
-              {/* S3 WORM Compliance Tier */}
               <div>
                 <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1 flex items-center gap-1">
                   <Lock size={12} /> S3 WORM Compliance Mode Retention
@@ -616,11 +754,11 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 7 · Provisioning Pipeline Screen ── */}
+          {/* ── 9 · Provisioning Pipeline ── */}
           {step === STEP_PROVISION && (
             <div className="py-4">
               <h2 className="text-lg font-bold text-white mb-1">Deploying Sovereign Zero Trust Posture…</h2>
-              <p className="text-sm text-gray-500 mb-5">Binding IdP connectors, sovereign AWS VPCs, and in-country aBFT consensus.</p>
+              <p className="text-sm text-gray-500 mb-5">Arming agentic RCE boundaries, supply chain sandbox, and in-country aBFT consensus.</p>
               <div className="space-y-2.5 max-w-md mx-auto">
                 {provisionTasks.map((taskText, i) => {
                   const done = i < provisionIdx;
@@ -640,16 +778,16 @@ export function FirstTimeSetup() {
             </div>
           )}
 
-          {/* ── 8 · Completed & Ready Screen ── */}
+          {/* ── 10 · Completed Screen ── */}
           {step === STEP_DONE && (
             <div className="text-center py-6">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 border"
                 style={{ background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.3)' }}>
                 <Check size={32} className="text-green-400" />
               </div>
-              <h1 className="text-2xl font-bold text-white mb-2">Sovereign Posture Successfully Applied</h1>
+              <h1 className="text-2xl font-bold text-white mb-2">Sovereign Architecture Online</h1>
               <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-                {selectedFrameworks.length} Frameworks Active · {IDP_PROVIDERS.find(i => i.id === selectedIdp)?.name} Bound · {sanctionedApps.length} Apps Governed · Predictive QoE Online ·
+                {selectedFrameworks.length} Frameworks Active · {IDP_PROVIDERS.find(i => i.id === selectedIdp)?.name} Bound · Agentic RCE Defense Active · LLM Supply Chain Sandbox Armed ·
                 {' '}{SOVEREIGN_CELL_REGIONS.find(r => r.id === sovereignRegion)?.name} Enclave Isolated · Private Hiero aBFT Ledger Locked.
               </p>
               <button onClick={finish}
