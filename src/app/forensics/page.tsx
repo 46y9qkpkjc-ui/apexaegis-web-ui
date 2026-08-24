@@ -2,9 +2,23 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HiOutlineExclamationTriangle, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineArrowPath, HiOutlineShieldCheck, HiOutlineClock, HiOutlineCpuChip, HiOutlineSignal, HiOutlineGlobeAlt, HiOutlineDocumentText, HiOutlineCommandLine, HiOutlineChatBubbleLeftRight, HiOutlineEnvelope, HiOutlineArrowUturnLeft, HiOutlineSearch } from 'react-icons/hi2';
 import { FiRefreshCw, FiSearch, FiDownload, FiSend, FiChevronDown, FiChevronUp } from 'react-icons/fi';
-
+import { 
+  HiOutlineExclamationTriangle, 
+  HiOutlineCheckCircle, 
+  HiOutlineXCircle, 
+  HiOutlineArrowPath, 
+  HiOutlineShieldCheck, 
+  HiOutlineClock, 
+  HiOutlineCpuChip, 
+  HiOutlineSignal, 
+  HiOutlineGlobeAlt, 
+  HiOutlineDocumentText, 
+  HiOutlineCommandLine, 
+  HiOutlineChatBubbleLeftRight, 
+  HiOutlineEnvelope, 
+  HiOutlineArrowUturnLeft 
+} from 'react-icons/hi2';
 // Types
 interface ForensicEvidence {
   pillar: string;
@@ -363,7 +377,7 @@ CONFIDENCE: ${(selectedRecord.confidenceScore * 100).toFixed(0)}%
               {/* Causal Root Cause */}
               <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-indigo-400 mb-2 flex items-center gap-2">
-                  <HiOutlineSearch className="w-4 h-4" />
+                  <FiSearch className="w-4 h-4" />
                   Causal Root Cause
                 </h3>
                 <p className="text-gray-200">{selectedRecord.causalRootCause}</p>
