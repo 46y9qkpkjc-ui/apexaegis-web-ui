@@ -20,6 +20,9 @@ export interface AiAction {
     | 'iap_proxy'
     | 'url_lookup'
     | 'search'
+    | 'analyze_session'
+    | 'escalate_to_ciso'
+    | 'emergency_override'
     | 'info'
     | 'error';
   payload: Record<string, unknown>;
@@ -223,6 +226,39 @@ export function processCommand(input: string): AiAction {
       type: 'create_ticket',
       payload: { platform, description: q },
       summary: `Creating ${platform === 'jira' ? 'Jira' : 'ServiceNow'} ticket`,
+    };
+  }
+
+  // ── Analyze session ──────────────────────────────────────
+  const sessionMatch = q.match(/(?:why|what|how|analyze|explain).*session\s*(?:#)?([a-f0-9-]+)/i);
+  if (sessionMatch || /session.*block|block.*session/i.test(q)) {
+    const sessionId = sessionMatch?.[1] || '8f92a1';
+    return {
+      type: 'analyze_session',
+      payload: { sessionId, query: q },
+      summary: `Analyzing session #${sessionId}: CATE score dropped from 85 to 42 due to unauthorized outbound connection to api.openai.com. Autonomous AI agent detected executing without human interactive context. Session isolated, OAuth token revoked. Root cause: AI agent bypassed NHI governance controls.`,
+    };
+  }
+
+  // ── Escalate to CISO ────────────────────────────────────
+  if (/escalate|send.*ciso|ciso.*alert|notify.*ciso|evidence.*pack|send.*evidence/i.test(q)) {
+    return {
+      type: 'escalate_to_ciso',
+      payload: { query: q, priority: /urgent|critical|high/i.test(q) ? 'critical' : 'high' },
+      summary: 'Escalating to CISO with full evidence pack: session timeline, CATE score deltas, DLP triggers, containment actions, and Hiero DLT proof. Notification sent to CISO mobile and Teams channel.',
+    };
+  }
+
+  // ── Emergency override / change request ─────────────────
+  const overrideMatch = q.match(/(?:emergency|break.?glass|override|change.?request).*(?:host|ip|server)\s*(\d+\.\d+\.\d+\.\d+)/i);
+  const durationMatch = q.match(/(\d+)\s*(?:hour|hr|h)/i);
+  if (/emergency|break.?glass|override|change.?request/i.test(q)) {
+    const host = overrideMatch?.[1] || '10.0.4.12';
+    const duration = durationMatch?.[1] || '1';
+    return {
+      type: 'emergency_override',
+      payload: { host, duration, query: q, autoSubmit: true },
+      summary: `Submitting pre-filled ITSM change request for emergency ${duration}-hour override on host ${host}. Automated CI mapping applied. Request pending CISO approval with Hiero DLT audit trail.`,
     };
   }
 

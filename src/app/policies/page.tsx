@@ -1,553 +1,270 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { Shield, Plus, GripVertical, ChevronDown, ChevronUp, Pencil, Trash2, Copy, Power, Play, Lock } from 'lucide-react';
-import { InlineObjectCreator } from '@/components/policies/inline-object-creator';
-import { PolicyEditor } from '@/components/policies/policy-editor';
-import { PolicyEngineVisualization } from '@/components/policies/policy-engine-viz';
-import { toast } from 'sonner';
-import {
-  fetchPolicies,
-  createPolicy as apiCreatePolicy,
-  updatePolicy as apiUpdatePolicy,
-  deletePolicy as apiDeletePolicy,
-} from '@/lib/policy-api';
 
-interface SecurityPolicy {
-  id: string;
-  seq: number;
-  name: string;
-  enabled: boolean;
-  trafficSteering: string;
-  accessMethod: string[];
-  sourceUsers: string[];
-  sourceDeviceGroups: string[];
-  sourceAddresses: string[];
-  destAddresses: string[];
-  destCloudApps: string[];
-  destUrlCategories: string[];
-  services: string[];
-  httpMethods: string[];
-  atpProfile: string | null;
-  sslProfile: string | null;
-  dnsFilterList: string | null;
-  contentInspection: any | null;
-  activityControls: any | null;
-  wafConfig: any | null;
-  iapConfig: any | null;
-  action: 'allow' | 'deny' | 'monitor';
-  logTraffic: boolean;
-  // Catch-all "default deny": pinned to the bottom, always evaluated last.
-  isDefault?: boolean;
-}
+import { useState } from 'react';
 
-// Demo data
-const demoPolicies: SecurityPolicy[] = [
-  {
-    id: '1', seq: 1, name: 'Block Malware & Phishing', enabled: true,
-    trafficSteering: 'internet', accessMethod: ['browser', 'api'],
-    sourceUsers: ['All Users'], sourceDeviceGroups: ['Managed Devices'],
-    sourceAddresses: ['Internal Subnets'],
-    destAddresses: ['any'], destCloudApps: [],
-    destUrlCategories: ['Malware', 'Phishing', 'Spyware', 'Cryptomining'],
-    services: ['HTTPS', 'HTTP'], httpMethods: [],
-    atpProfile: 'Default-ATP', sslProfile: 'Certificate Inspection',
-    dnsFilterList: 'Block-Malicious', contentInspection: null, activityControls: null, wafConfig: null, iapConfig: null, action: 'deny', logTraffic: true,
-  },
-  {
-    id: '2', seq: 2, name: 'Allow Sanctioned SaaS', enabled: true,
-    trafficSteering: 'internet', accessMethod: ['browser'],
-    sourceUsers: ['Engineering', 'Product'], sourceDeviceGroups: ['All Devices'],
-    sourceAddresses: ['any'],
-    destAddresses: [], destCloudApps: ['Microsoft 365', 'Slack', 'GitHub', 'Jira'],
-    destUrlCategories: [],
-    services: ['HTTPS'], httpMethods: [],
-    atpProfile: 'Default-ATP', sslProfile: 'Full Inspection',
-    dnsFilterList: null, contentInspection: { enabled: true }, activityControls: { enabled: true }, wafConfig: null, iapConfig: null, action: 'allow', logTraffic: true,
-  },
-  {
-    id: '3', seq: 3, name: 'Block NRD & NOD', enabled: true,
-    trafficSteering: 'internet', accessMethod: ['browser', 'api', 'agent'],
-    sourceUsers: ['All Users'], sourceDeviceGroups: ['All Devices'],
-    sourceAddresses: ['any'],
-    destAddresses: ['any'], destCloudApps: [],
-    destUrlCategories: ['Newly Registered Domains', 'Newly Observed Domains'],
-    services: ['HTTPS', 'HTTP', 'DNS'], httpMethods: [],
-    atpProfile: null, sslProfile: null,
-    dnsFilterList: 'Block-NRD-NOD', contentInspection: null, activityControls: null, wafConfig: null, iapConfig: null, action: 'deny', logTraffic: true,
-  },
-  {
-    id: '4', seq: 4, name: 'Default Allow', enabled: true,
-    trafficSteering: 'internet', accessMethod: ['browser', 'api', 'agent'],
-    sourceUsers: ['All Users'], sourceDeviceGroups: ['All Devices'],
-    sourceAddresses: ['any'],
-    destAddresses: ['any'], destCloudApps: [],
-    destUrlCategories: [],
-    services: ['any'], httpMethods: [],
-    atpProfile: 'Default-ATP', sslProfile: 'Certificate Inspection',
-    dnsFilterList: null, contentInspection: null, activityControls: null, wafConfig: null, iapConfig: null, action: 'allow', logTraffic: true,
-  },
+const CATE_TIERS = [
+  { id: 'tier1', label: 'Tier 1 Critical', threshold: 25, color: '#ef4444', description: 'Critical assets, financial systems, PII databases' },
+  { id: 'tier2', label: 'Tier 2 Internal', threshold: 60, color: '#f59e0b', description: 'Internal applications, email, collaboration tools' },
+  { id: 'tier3', label: 'Tier 3 SaaS/Web', threshold: 80, color: '#22c55e', description: 'Public SaaS, web browsing, GenAI tools' },
+];
+
+const ENFORCEMENT_ACTIONS = [
+  { id: 'fido2', label: 'FIDO2/WebAuthn Step-Up', icon: '🔑', description: 'Force re-authentication with hardware key' },
+  { id: 'readonly', label: 'Read-Only Mode', icon: '👁️', description: 'Restrict to view-only access' },
+  { id: 'rbi', label: 'Remote Browser Isolation', icon: '🌐', description: 'Isolate session in cloud browser' },
+  { id: 'micro', label: 'Micro-Isolation', icon: '🔒', description: 'Isolate to specific network segment' },
+];
+
+const SANCTIONED_APPS = [
+  { name: 'Microsoft 365', category: 'Productivity', status: 'approved', oauth: 'inline', dlp: 'enabled' },
+  { name: 'Slack', category: 'Communication', status: 'approved', oauth: 'inline', dlp: 'enabled' },
+  { name: 'GitHub Enterprise', category: 'Development', status: 'approved', oauth: 'inline', dlp: 'enabled' },
+  { name: 'ChatGPT Enterprise', category: 'GenAI', status: 'approved', oauth: 'intercept', dlp: 'strict' },
+  { name: 'Claude Enterprise', category: 'GenAI', status: 'approved', oauth: 'intercept', dlp: 'strict' },
+  { name: 'Notion', category: 'Productivity', status: 'approved', oauth: 'inline', dlp: 'enabled' },
+  { name: 'Figma', category: 'Design', status: 'approved', oauth: 'inline', dlp: 'standard' },
+  { name: 'Salesforce', category: 'CRM', status: 'approved', oauth: 'inline', dlp: 'enabled' },
+];
+
+const QOE_APPS = [
+  { name: 'Microsoft Teams', priority: 'critical', bandwidth: 'guaranteed', nicQos: 'enabled' },
+  { name: 'Zoom', priority: 'critical', bandwidth: 'guaranteed', nicQos: 'enabled' },
+  { name: 'Webex', priority: 'critical', bandwidth: 'guaranteed', nicQos: 'enabled' },
+  { name: 'Google Meet', priority: 'high', bandwidth: 'priority', nicQos: 'enabled' },
+  { name: 'Slack Huddles', priority: 'high', bandwidth: 'priority', nicQos: 'enabled' },
 ];
 
 export default function PoliciesPage() {
-  const [policies, setPolicies] = useState<SecurityPolicy[]>(demoPolicies);
-  const [editingPolicy, setEditingPolicy] = useState<SecurityPolicy | null>(null);
-  const [showEditor, setShowEditor] = useState(false);
-  const [showEngineViz, setShowEngineViz] = useState(false);
-  const [insertPosition, setInsertPosition] = useState<{ refId: string; position: 'before' | 'after' } | null>(null);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
-  const [apiConnected, setApiConnected] = useState(false);
+  const [cateScore, setCateScore] = useState(45);
+  const [enforceStepUp, setEnforceStepUp] = useState(true);
+  const [enforceReadOnly, setEnforceReadOnly] = useState(false);
+  const [enforceRbi, setEnforceRbi] = useState(false);
+  const [nicBackoff, setNicBackoff] = useState(80);
 
-  // Load policies from management plane API on mount, fallback to demo data
-  const loadPolicies = useCallback(async () => {
-    try {
-      const { policies: apiPolicies } = await fetchPolicies();
-      // A successful fetch means the backend is reachable — treat as connected even
-      // when the tenant has zero policies (e.g. Aspire). The old `length > 0` gate
-      // left apiConnected=false for such tenants, so every write (create/edit/delete/
-      // reorder) was skipped and only added to React state → vanished on refresh.
-      // Show real data (even empty), never the cross-tenant demo, when connected.
-      setPolicies(apiPolicies);
-      setApiConnected(true);
-    } catch {
-      // Backend unreachable — keep the demo policies as an offline fallback only.
-      setApiConnected(false);
-    }
-  }, []);
-
-  useEffect(() => { loadPolicies(); }, [loadPolicies]);
-
-  // Persist sequence numbers to backend after reorder
-  const syncSequences = useCallback(async (reordered: SecurityPolicy[]) => {
-    if (!apiConnected) return;
-    try {
-      await Promise.all(
-        reordered.map(p => apiUpdatePolicy(p.id, p))
-      );
-    } catch {
-      toast.error('Failed to save policy order');
-      loadPolicies();
-    }
-  }, [apiConnected, loadPolicies]);
-
-  const handleDrop = (targetId: string) => {
-    if (!draggedId || draggedId === targetId) { setDraggedId(null); setDragOverId(null); return; }
-    setPolicies(prev => {
-      const fromIdx = prev.findIndex(p => p.id === draggedId);
-      const toIdx = prev.findIndex(p => p.id === targetId);
-      if (fromIdx < 0 || toIdx < 0) return prev;
-      const updated = [...prev];
-      const [moved] = updated.splice(fromIdx, 1);
-      updated.splice(toIdx, 0, moved);
-      const reordered = updated.map((p, i) => ({ ...p, seq: i + 1 }));
-      syncSequences(reordered);
-      return reordered;
-    });
-    setDraggedId(null);
-    setDragOverId(null);
+  const getActiveTier = (score: number) => {
+    if (score < CATE_TIERS[0].threshold) return CATE_TIERS[0];
+    if (score < CATE_TIERS[1].threshold) return CATE_TIERS[1];
+    return CATE_TIERS[2];
   };
 
-  const handleToggle = async (id: string) => {
-    const target = policies.find(p => p.id === id);
-    setPolicies(prev =>
-      prev.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p)
-    );
-    if (apiConnected && target) {
-      try {
-        await apiUpdatePolicy(id, { ...target, enabled: !target.enabled });
-      } catch {
-        toast.error('Failed to update policy on server');
-        loadPolicies();
-      }
-    }
-  };
-
-  const handleNewPolicy = () => {
-    setEditingPolicy(null);
-    setInsertPosition(null);
-    setShowEditor(true);
-  };
-
-  const handleEdit = (policy: SecurityPolicy) => {
-    setEditingPolicy(policy);
-    setShowEditor(true);
-  };
-
-  const handleClone = async (policy: SecurityPolicy) => {
-    const cloned: SecurityPolicy = {
-      ...policy,
-      id: String(Date.now()),
-      name: policy.name + ' (Copy)',
-      seq: policies.length + 1,
-    };
-    const idx = policies.findIndex(p => p.id === policy.id);
-    const updated = [...policies];
-    updated.splice(idx + 1, 0, cloned);
-    setPolicies(updated.map((p, i) => ({ ...p, seq: i + 1 })));
-    if (apiConnected) {
-      try {
-        const { policyId } = await apiCreatePolicy(cloned);
-        setPolicies(prev => prev.map(p => p.id === cloned.id ? { ...p, id: policyId } : p));
-        toast.success('Policy cloned');
-      } catch {
-        toast.error('Failed to clone policy on server');
-        loadPolicies();
-      }
-    }
-  };
-
-  const handleDeletePolicy = async (id: string) => {
-    setPolicies(prev => prev.filter(p => p.id !== id).map((p, i) => ({ ...p, seq: i + 1 })));
-    if (apiConnected) {
-      try {
-        await apiDeletePolicy(id);
-        toast.success('Policy deleted');
-      } catch {
-        toast.error('Failed to delete policy on server');
-        loadPolicies();
-      }
-    }
-  };
-
-  const handleInsertBeforeAfter = (refId: string, position: 'before' | 'after') => {
-    setEditingPolicy(null);
-    setInsertPosition({ refId, position });
-    setShowEditor(true);
-  };
-
-  const handleMoveUp = (id: string) => {
-    const idx = policies.findIndex(p => p.id === id);
-    if (idx <= 0) return;
-    const updated = [...policies];
-    [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
-    const reordered = updated.map((p, i) => ({ ...p, seq: i + 1 }));
-    setPolicies(reordered);
-    syncSequences(reordered);
-  };
-
-  const handleMoveDown = (id: string) => {
-    const idx = policies.findIndex(p => p.id === id);
-    if (idx < 0 || idx >= policies.length - 1) return;
-    const updated = [...policies];
-    [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
-    const reordered = updated.map((p, i) => ({ ...p, seq: i + 1 }));
-    setPolicies(reordered);
-    syncSequences(reordered);
-  };
-
-  const actionBadge = (action: string) => {
-    const colors: Record<string, string> = {
-      allow: 'bg-green-900/40 text-green-400 border-green-800',
-      deny: 'bg-red-900/40 text-red-400 border-red-800',
-      monitor: 'bg-yellow-900/40 text-yellow-400 border-yellow-800',
-    };
-    return colors[action] || 'bg-gray-800 text-gray-400';
-  };
+  const activeTier = getActiveTier(cateScore);
 
   return (
-    <div>
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Shield size={24} className="text-blue-400" />
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-100">CATE Policies & Access Gates</h1>
+        <p className="text-sm text-gray-400 mt-1">
+          Single interface to govern continuous trust, dynamic mid-session actions, sanctioned applications, and local NIC QoS rules.
+        </p>
+      </div>
+
+      {/* CATE Threshold Slider */}
+      <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-gray-100 mb-4">Continuous Adaptive Trust (CARTA) Thresholds</h2>
+        <div className="space-y-4">
           <div>
-            <h1 className="text-xl font-semibold">Security Policies</h1>
-            <p className="text-sm text-gray-500">
-              Unified DNS, Web, and Threat policies — evaluated top-to-bottom, first match wins
-            </p>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-400">Trust Score Threshold</span>
+              <span className="text-sm font-mono" style={{ color: activeTier.color }}>{cateScore}/100</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={cateScore}
+              onChange={(e) => setCateScore(parseInt(e.target.value))}
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, ${CATE_TIERS[0].color} 0%, ${CATE_TIERS[0].color} 25%, ${CATE_TIERS[1].color} 25%, ${CATE_TIERS[1].color} 60%, ${CATE_TIERS[2].color} 60%, ${CATE_TIERS[2].color} 100%)`,
+              }}
+            />
+            <div className="flex justify-between mt-2 text-xs text-gray-500">
+              <span>0</span>
+              <span>25</span>
+              <span>60</span>
+              <span>80</span>
+              <span>100</span>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            {CATE_TIERS.map((tier) => (
+              <div
+                key={tier.id}
+                className={`p-4 rounded-lg border transition-all ${
+                  activeTier.id === tier.id
+                    ? 'border-opacity-50 bg-opacity-10'
+                    : 'border-gray-700/50 bg-gray-800/30'
+                }`}
+                style={{
+                  borderColor: activeTier.id === tier.id ? tier.color : undefined,
+                  backgroundColor: activeTier.id === tier.id ? `${tier.color}15` : undefined,
+                }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tier.color }} />
+                  <span className="font-medium text-gray-200">{tier.label}</span>
+                </div>
+                <div className="text-xs text-gray-400">Threshold: &lt;{tier.threshold}</div>
+                <div className="text-xs text-gray-500 mt-1">{tier.description}</div>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowEngineViz(v => !v)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              showEngineViz ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
-            }`}
-          >
-            <Play size={16} />
-            Engine Visualizer
-          </button>
-          <button
-            onClick={handleNewPolicy}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus size={16} />
-            Create Policy
-          </button>
-        </div>
       </div>
 
-      {/* Engine Visualization */}
-      {showEngineViz && (
-        <div className="mb-6">
-          <PolicyEngineVisualization />
-        </div>
-      )}
-
-      {/* Policy table — FortiGate-style */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-800/50 text-gray-400 text-xs uppercase tracking-wider">
-              <th className="w-8 px-3 py-3"></th>
-              <th className="px-3 py-3 text-left">Seq</th>
-              <th className="px-3 py-3 text-left">Name</th>
-              <th className="px-3 py-3 text-left">Source</th>
-              <th className="px-3 py-3 text-left">Destination</th>
-              <th className="px-3 py-3 text-left">Service</th>
-              <th className="px-3 py-3 text-left">Security Profiles</th>
-              <th className="px-3 py-3 text-center">Action</th>
-              <th className="px-3 py-3 text-center">Status</th>
-              <th className="w-20 px-3 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800/50">
-            {[...policies].sort((a, b) => Number(!!a.isDefault) - Number(!!b.isDefault)).map((policy) => (
-              <tr
-                key={policy.id}
-                className={`hover:bg-gray-800/30 transition-colors ${!policy.enabled ? 'opacity-40' : ''} ${draggedId === policy.id ? 'opacity-30' : ''} ${dragOverId === policy.id && draggedId !== policy.id ? 'border-t-2 border-t-blue-500' : ''} ${policy.isDefault ? 'bg-gray-950/40' : ''}`}
-                onDragOver={e => { if (policy.isDefault) return; e.preventDefault(); setDragOverId(policy.id); }}
-                onDragLeave={() => setDragOverId(null)}
-                onDrop={e => { if (policy.isDefault) return; e.preventDefault(); handleDrop(policy.id); }}
-              >
-                <td
-                  className={`px-3 py-3 text-gray-600 ${policy.isDefault ? 'cursor-not-allowed' : 'cursor-grab'}`}
-                  draggable={!policy.isDefault}
-                  onDragStart={() => { if (!policy.isDefault) setDraggedId(policy.id); }}
-                  onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
-                  title={policy.isDefault ? 'Default catch-all — always evaluated last' : undefined}
+      {/* Mid-Session Dynamic Enforcements */}
+      <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-gray-100 mb-4">Mid-Session Dynamic Enforcements</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Configure automated actions when trust score degrades below threshold during active sessions.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          {ENFORCEMENT_ACTIONS.map((action) => (
+            <div key={action.id} className="p-4 rounded-lg border border-gray-700/50 bg-gray-800/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{action.icon}</span>
+                  <div>
+                    <div className="font-medium text-gray-200">{action.label}</div>
+                    <div className="text-xs text-gray-400">{action.description}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (action.id === 'fido2') setEnforceStepUp(!enforceStepUp);
+                    if (action.id === 'readonly') setEnforceReadOnly(!enforceReadOnly);
+                    if (action.id === 'rbi') setEnforceRbi(!enforceRbi);
+                  }}
+                  className={`w-12 h-6 rounded-full transition-colors ${
+                    (action.id === 'fido2' && enforceStepUp) ||
+                    (action.id === 'readonly' && enforceReadOnly) ||
+                    (action.id === 'rbi' && enforceRbi)
+                      ? 'bg-cyan-600'
+                      : 'bg-gray-700'
+                  }`}
                 >
-                  {policy.isDefault ? <Lock size={14} /> : <GripVertical size={14} />}
-                </td>
-                <td className="px-3 py-3 text-gray-500 font-mono text-xs">{policy.isDefault ? '∞' : policy.seq}</td>
-                <td className="px-3 py-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleEdit(policy)}
-                      className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
-                    >
-                      {policy.name}
-                    </button>
-                    {policy.isDefault && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-[10px] border border-gray-700 uppercase tracking-wide">
-                        <Lock size={9} /> always last
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-3 py-3">
-                  <div className="space-y-0.5">
-                    {policy.sourceUsers.map(u => (
-                      <span key={u} className="inline-block mr-1 px-2 py-0.5 rounded bg-purple-900/30 text-purple-300 text-xs border border-purple-800/50">
-                        {u}
-                      </span>
-                    ))}
-                    {policy.sourceDeviceGroups.map(d => (
-                      <span key={d} className="inline-block mr-1 px-2 py-0.5 rounded bg-cyan-900/30 text-cyan-300 text-xs border border-cyan-800/50">
-                        {d}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-3 py-3">
-                  <div className="space-y-0.5">
-                    {policy.destUrlCategories.map(c => (
-                      <span key={c} className="inline-block mr-1 px-2 py-0.5 rounded bg-orange-900/30 text-orange-300 text-xs border border-orange-800/50">
-                        {c}
-                      </span>
-                    ))}
-                    {policy.destCloudApps.map(a => (
-                      <span key={a} className="inline-block mr-1 px-2 py-0.5 rounded bg-blue-900/30 text-blue-300 text-xs border border-blue-800/50">
-                        {a}
-                      </span>
-                    ))}
-                    {policy.destUrlCategories.length === 0 && policy.destCloudApps.length === 0 && (
-                      <span className="text-gray-500 text-xs">any</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-3 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {policy.services.map(s => (
-                      <span key={s} className="px-2 py-0.5 rounded bg-gray-800 text-gray-300 text-xs">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-3 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {policy.atpProfile && (
-                      <span className="px-2 py-0.5 rounded bg-red-900/20 text-red-300 text-xs border border-red-800/30">
-                        ATP
-                      </span>
-                    )}
-                    {policy.sslProfile && (
-                      <span className="px-2 py-0.5 rounded bg-yellow-900/20 text-yellow-300 text-xs border border-yellow-800/30">
-                        SSL
-                      </span>
-                    )}
-                    {policy.dnsFilterList && (
-                      <span className="px-2 py-0.5 rounded bg-green-900/20 text-green-300 text-xs border border-green-800/30">
-                        DNS
-                      </span>
-                    )}
-                    {policy.contentInspection?.enabled && (
-                      <span className="px-2 py-0.5 rounded bg-purple-900/20 text-purple-300 text-xs border border-purple-800/30">
-                        DPI
-                      </span>
-                    )}
-                    {policy.activityControls?.enabled && (
-                      <span className="px-2 py-0.5 rounded bg-amber-900/20 text-amber-300 text-xs border border-amber-800/30">
-                        ACL
-                      </span>
-                    )}
-                    {policy.wafConfig?.enabled && (
-                      <span className="px-2 py-0.5 rounded bg-red-900/20 text-red-300 text-xs border border-red-800/30">
-                        WAF
-                      </span>
-                    )}
-                    {policy.iapConfig?.enabled && (
-                      <span className="px-2 py-0.5 rounded bg-teal-900/20 text-teal-300 text-xs border border-teal-800/30">
-                        IAP
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span className={`inline-block px-2.5 py-0.5 rounded text-xs font-medium border ${actionBadge(policy.action)}`}>
-                    {policy.action.toUpperCase()}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <button
-                    onClick={() => handleToggle(policy.id)}
-                    className={`w-8 h-4 rounded-full transition-colors relative ${policy.enabled ? 'bg-green-600' : 'bg-gray-700'}`}
-                  >
-                    <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${policy.enabled ? 'left-4' : 'left-0.5'}`} />
-                  </button>
-                </td>
-                <td className="px-3 py-3">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleEdit(policy)}
-                      className="p-1 text-gray-500 hover:text-blue-400 transition-colors"
-                      title="Edit"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button onClick={() => handleClone(policy)} className="p-1 text-gray-500 hover:text-yellow-400 transition-colors" title="Clone">
-                      <Copy size={14} />
-                    </button>
-                    <button onClick={() => handleDeletePolicy(policy.id)} className="p-1 text-gray-500 hover:text-red-400 transition-colors" title="Delete">
-                      <Trash2 size={14} />
-                    </button>
-                    {!policy.isDefault && (
-                      <>
-                        <button onClick={() => handleMoveUp(policy.id)} className="p-1 text-gray-500 hover:text-green-400 transition-colors" title="Move Up">
-                          <ChevronUp size={14} />
-                        </button>
-                        <button onClick={() => handleMoveDown(policy.id)} className="p-1 text-gray-500 hover:text-green-400 transition-colors" title="Move Down">
-                          <ChevronDown size={14} />
-                        </button>
-                      </>
-                    )}
-                    <div className="relative group">
-                      <button className="p-1 text-gray-500 hover:text-purple-400 transition-colors" title="Insert policy">
-                        <Plus size={14} />
-                      </button>
-                      <div className="absolute right-0 top-full mt-1 w-36 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-30 hidden group-hover:block">
-                        <button onClick={() => handleInsertBeforeAfter(policy.id, 'before')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-800 rounded-t-lg transition-colors">Insert Before</button>
-                        <button onClick={() => handleInsertBeforeAfter(policy.id, 'after')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-800 rounded-b-lg transition-colors">Insert After</button>
-                      </div>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
+                    (action.id === 'fido2' && enforceStepUp) ||
+                    (action.id === 'readonly' && enforceReadOnly) ||
+                    (action.id === 'rbi' && enforceRbi)
+                      ? 'translate-x-6'
+                      : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Policy Editor Drawer */}
-      {showEditor && (
-        <PolicyEditor
-          policy={editingPolicy}
-          onClose={() => setShowEditor(false)}
-          onSave={async (saved) => {
-            if (saved.id) {
-              // Update existing — preserve current seq
-              const existing = policies.find(p => p.id === saved.id);
-              const merged = { ...existing, ...saved, seq: existing?.seq ?? saved.seq };
-              setPolicies(prev => prev.map(p => p.id === saved.id ? { ...p, ...merged } : p));
-              if (apiConnected) {
-                try {
-                  await apiUpdatePolicy(saved.id, merged);
-                  toast.success('Policy saved');
-                } catch {
-                  toast.error('Failed to save policy on server');
-                  loadPolicies();
-                }
-              }
-            } else {
-              // Create new
-              const newId = String(Date.now());
-              const newPolicy = {
-                id: newId,
-                seq: 0,
-                httpMethods: [] as string[],
-                ...saved,
-              };
-              // Insert at specific position if requested
-              const insertCtx: { reordered: SecurityPolicy[] | null } = { reordered: null };
-              setPolicies(prev => {
-                if (insertPosition) {
-                  const refIdx = prev.findIndex(p => p.id === insertPosition.refId);
-                  if (refIdx >= 0) {
-                    const insertIdx = insertPosition.position === 'before' ? refIdx : refIdx + 1;
-                    const updated = [...prev];
-                    updated.splice(insertIdx, 0, newPolicy);
-                    setInsertPosition(null);
-                    insertCtx.reordered = updated.map((p, i) => ({ ...p, seq: i + 1 }));
-                    return insertCtx.reordered;
-                  }
-                }
-                const newSeq = prev.length + 1;
-                return [...prev, { ...newPolicy, seq: newSeq }];
-              });
-              if (apiConnected) {
-                try {
-                  const { policyId } = await apiCreatePolicy(newPolicy);
-                  setPolicies(prev => prev.map(p => p.id === newId ? { ...p, id: policyId } : p));
-                  // Sync surrounding sequences when inserted at a position
-                  if (insertCtx.reordered) {
-                    await Promise.all(
-                      insertCtx.reordered.filter((p: SecurityPolicy) => p.id !== newId).map((p: SecurityPolicy) => apiUpdatePolicy(p.id, p))
-                    );
-                  }
-                  toast.success('Policy created');
-                } catch {
-                  toast.error('Failed to create policy on server');
-                  loadPolicies();
-                }
-              }
-            }
-            setShowEditor(false);
-            setInsertPosition(null);
-          }}
-          existingPolicies={policies.map(p => ({
-            name: p.name,
-            action: p.action,
-            sourceUsers: p.sourceUsers,
-            sourceAddresses: p.sourceAddresses,
-            destUrlCategories: p.destUrlCategories,
-            destCloudApps: p.destCloudApps,
-            destAddresses: p.destAddresses,
-            services: p.services,
-            dnsFilterList: p.dnsFilterList,
-          }))}
-        />
-      )}
+      {/* Sanctioned Apps & NHI Catalog */}
+      <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-gray-100 mb-4">Sanctioned Apps & NHI Catalog</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Approved enterprise SaaS and GenAI tools with inline OAuth consent interception and backend API scope controls.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-700/50">
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Application</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Category</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">OAuth Mode</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">DLP Policy</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SANCTIONED_APPS.map((app) => (
+                <tr key={app.name} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                  <td className="py-3 px-4 font-medium text-gray-200">{app.name}</td>
+                  <td className="py-3 px-4 text-gray-400">{app.category}</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      app.oauth === 'intercept' ? 'bg-amber-500/20 text-amber-400' : 'bg-cyan-500/20 text-cyan-400'
+                    }`}>
+                      {app.oauth === 'intercept' ? 'Intercept' : 'Inline'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      app.dlp === 'strict' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
+                    }`}>
+                      {app.dlp}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-1 rounded text-xs bg-green-500/20 text-green-400">{app.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Predictive QoE & NIC Contention */}
+      <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-gray-100 mb-4">Predictive QoE & NIC Contention</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Real-time collaboration app priorities and dynamic physical NIC background back-off trigger percentage.
+        </p>
+        
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-gray-400">NIC Background Back-Off Trigger</span>
+            <span className="text-sm font-mono text-cyan-400">{nicBackoff}%</span>
+          </div>
+          <input
+            type="range"
+            min="50"
+            max="95"
+            value={nicBackoff}
+            onChange={(e) => setNicBackoff(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          />
+          <div className="flex justify-between mt-2 text-xs text-gray-500">
+            <span>50%</span>
+            <span>70%</span>
+            <span>80%</span>
+            <span>90%</span>
+            <span>95%</span>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-700/50">
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Application</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Priority</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Bandwidth</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">NIC QoS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {QOE_APPS.map((app) => (
+                <tr key={app.name} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                  <td className="py-3 px-4 font-medium text-gray-200">{app.name}</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      app.priority === 'critical' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {app.priority}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-gray-400">{app.bandwidth}</td>
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-1 rounded text-xs bg-green-500/20 text-green-400">{app.nicQos}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

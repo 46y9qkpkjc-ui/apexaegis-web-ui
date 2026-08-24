@@ -27,6 +27,9 @@ function ActionIcon({ type }: { type: AiAction['type'] }) {
     case 'activity_control': return <Lock size={14} className="text-amber-400" />;
     case 'waf_config': return <Zap size={14} className="text-red-400" />;
     case 'iap_proxy': return <Fingerprint size={14} className="text-teal-400" />;
+    case 'analyze_session': return <FileText size={14} className="text-cyan-400" />;
+    case 'escalate_to_ciso': return <AlertTriangle size={14} className="text-amber-400" />;
+    case 'emergency_override': return <Zap size={14} className="text-red-400" />;
     case 'error': return <AlertTriangle size={14} className="text-red-400" />;
     default: return <Sparkles size={14} className="text-gray-400" />;
   }
@@ -34,6 +37,9 @@ function ActionIcon({ type }: { type: AiAction['type'] }) {
 
 /* ─── Quick-action suggestions ────────────────────────────── */
 const SUGGESTIONS = [
+  'Why was session #8f92a1 blocked?',
+  'Escalate this block to CISO with evidence',
+  'Draft emergency 1-hour change request for 10.0.4.12',
   'Show critical logs',
   'Go to policies',
   'Lookup slack.com',
@@ -123,6 +129,17 @@ export function AiCommandCenter() {
         break;
       case 'iap_proxy':
         router.push('/policies');
+        toast.success(action.summary);
+        break;
+      case 'analyze_session':
+        router.push('/telemetry');
+        toast.info(action.summary);
+        break;
+      case 'escalate_to_ciso':
+        toast.success(action.summary);
+        break;
+      case 'emergency_override':
+        router.push('/approvals');
         toast.success(action.summary);
         break;
       case 'search':
