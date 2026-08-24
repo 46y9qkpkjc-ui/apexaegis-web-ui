@@ -119,12 +119,6 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'User Coach & Support',
-    items: [
-      { href: '/coach', icon: MessageSquare, label: 'Security Coach Portal' },
-    ],
-  },
-  {
     label: 'Identity & Security',
     items: [
       { href: '/identity/users', icon: Users, label: 'Users & Groups' },
@@ -248,30 +242,30 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <aside className={clsx(
       'bg-gray-900/80 backdrop-blur-xl border-r border-gray-800/60 flex flex-col transition-all duration-200 h-full',
-      sidebarCollapsed ? 'w-16' : 'w-60',
+      sidebarCollapsed ? 'w-14' : 'w-56',
     )}>
       {/* Logo (skins to the active brand) */}
-      <div className="h-14 px-4 flex items-center gap-3 border-b border-gray-800/60">
+      <div className="h-12 px-3 flex items-center gap-2 border-b border-gray-800/60">
         {brand.logoImg ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={brand.logoImg} alt={brand.name} className="h-8 w-auto max-w-none flex-shrink-0" />
+          <img src={brand.logoImg} alt={brand.name} className="h-7 w-auto max-w-none flex-shrink-0" />
         ) : brand.logoSvg ? (
           <span
             className={clsx(
-              'flex items-center flex-shrink-0 [&>svg]:h-8 [&>svg]:w-auto',
-              brand.logoBg && 'bg-white rounded-md p-1 [&>svg]:h-6 overflow-hidden',
+              'flex items-center flex-shrink-0 [&>svg]:h-7 [&>svg]:w-auto',
+              brand.logoBg && 'bg-white rounded-md p-1 [&>svg]:h-5 overflow-hidden',
             )}
             dangerouslySetInnerHTML={{ __html: brand.logoSvg }} />
         ) : (
-          <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center font-bold text-sm shadow-md shadow-cyan-600/20 flex-shrink-0">
+          <div className="w-7 h-7 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-lg flex items-center justify-center font-bold text-xs shadow-md shadow-cyan-600/20 flex-shrink-0">
             {brand.initial}
           </div>
         )}
-        {!sidebarCollapsed && !brand.wordmark && <span className="font-semibold text-lg tracking-tight">{brand.name}</span>}
+        {!sidebarCollapsed && !brand.wordmark && <span className="font-semibold text-base tracking-tight">{brand.name}</span>}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto py-1.5">
         {renderedGroups.map((group) => {
           const visibleItems = group.items.filter((item) => {
             if (item.mspOnly && !isMsp) return false;
@@ -293,12 +287,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <button
                   onClick={() => toggleGroup(group.label)}
                   className={clsx(
-                    'w-full flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors',
+                    'w-full flex items-center gap-1 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors',
                     hasActive ? 'text-blue-400/80' : 'text-gray-500 hover:text-gray-400',
                   )}
                 >
                   <ChevronRight
-                    size={10}
+                    size={9}
                     className={clsx(
                       'transition-transform duration-200 flex-shrink-0',
                       !isCollapsed && 'rotate-90',
@@ -325,14 +319,14 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                       onClick={onNavigate}
                       title={sidebarCollapsed ? item.label : undefined}
                       className={clsx(
-                        'flex items-center gap-3 mx-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-150',
+                        'flex items-center gap-2.5 mx-1.5 px-2.5 py-1 rounded-md text-xs transition-all duration-150',
                         active
                           ? 'bg-blue-600/15 text-blue-400 shadow-[inset_2px_0_0_0_rgba(59,130,246,0.6)]'
                           : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50',
                         sidebarCollapsed && 'justify-center px-0',
                       )}
                     >
-                      <Icon size={15} className={clsx(active && 'text-blue-400', 'flex-shrink-0')} />
+                      <Icon size={13} className={clsx(active && 'text-blue-400', 'flex-shrink-0')} />
                       {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                     </Link>
                   );
