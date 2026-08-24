@@ -10,15 +10,9 @@ import { fetchEntitlements } from '@/lib/tenants-api';
 import { useBrand, getBrand } from '@/lib/brands';
 import { useAuthStore, isMspUser } from '@/lib/auth-store';
 import {
-  Shield, Globe, Server, Users, Key, FileText,
-  Settings, BarChart3, Network, Lock, Bug,
-  MonitorSmartphone, Layers, AlertTriangle, ArrowDownToLine,
-  Activity, GitBranch, Router, Ghost, Wifi,
-  Crosshair, Brain, Smartphone, Bot,
-  ChevronRight, ChevronLeft, ShieldCheck, Award, Workflow,
   ShieldAlert, Search, ShieldOff, Building2,
   Database, UserCog, Radar, Compass,
-  MagnifyingGlass, DocumentText, ChatBubbleLeftRight, ArrowPath,
+  FileText, MessageSquare, RotateCw, // 👈 Replaced invalid Lucide icon names
 } from 'lucide-react';
 
 interface NavItem {
@@ -74,7 +68,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Causal Forensics & Remediation',
     items: [
-      { href: '/forensics', icon: MagnifyingGlass, label: 'Forensic & Remediation Hub' },
+      { href: '/forensics', icon: Search, label: 'Forensic & Remediation Hub' },
       { href: '/operations/ledger', icon: Database, label: 'Ledger & State Rollback' },
     ],
   },
@@ -89,7 +83,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'User Coach & Support',
     items: [
-      { href: '/coach', icon: ChatBubbleLeftRight, label: 'Security Coach Portal' },
+      { href: '/coach', icon: MessageSquare, label: 'Security Coach Portal' },
     ],
   },
   {
