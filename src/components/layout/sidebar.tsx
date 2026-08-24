@@ -47,9 +47,7 @@ const navGroups: NavGroup[] = [
     label: 'CATE Policies & Access Gates',
     items: [
       { href: '/policies', icon: Shield, label: 'CATE Thresholds & Gates' },
-      { href: '/policies/mid-session', icon: AlertTriangle, label: 'Mid-Session Enforcements' },
       { href: '/objects/cloud-apps', icon: Globe, label: 'Sanctioned Apps & NHI', featureId: 'casb' },
-      { href: '/policies/qoe', icon: Wifi, label: 'Predictive QoE & NIC QoS' },
     ],
   },
   {
@@ -70,26 +68,20 @@ const navGroups: NavGroup[] = [
     label: 'Sovereign Cells & DLT Audit',
     items: [
       { href: '/sovereignty', icon: Globe, label: 'Sovereign Cell Grid' },
-      { href: '/sovereignty/geofencing', icon: Crosshair, label: 'Hardware Geofencing' },
-      { href: '/sovereignty/consensus', icon: Database, label: 'Hiero aBFT Consensus' },
-      { href: '/sovereignty/worm', icon: Lock, label: 'S3 WORM Compliance' },
       { href: '/audit', icon: FileText, label: 'Immutable Audit Trail' },
     ],
   },
   {
     label: 'Causal Forensics & Remediation',
     items: [
-      { href: '/forensics', icon: MagnifyingGlass, label: 'Forensic Hub' },
-      { href: '/forensics/remediation', icon: ArrowPath, label: 'Remediation Actions' },
-      { href: '/operations/ledger', icon: Database, label: 'Ledger Operations & Rollback' },
+      { href: '/forensics', icon: MagnifyingGlass, label: 'Forensic & Remediation Hub' },
+      { href: '/operations/ledger', icon: Database, label: 'Ledger & State Rollback' },
     ],
   },
   {
     label: 'Break-Glass & Approvals',
     items: [
       { href: '/approvals', icon: ShieldCheck, label: 'Ephemeral Overrides' },
-      { href: '/approvals/queue', icon: AlertTriangle, label: 'CISO Review Queue' },
-      { href: '/approvals/audit', icon: ShieldAlert, label: 'Override Audit Log' },
       { href: '/admin/rbac', icon: UserCog, label: 'RBAC / Roles' },
       { href: '/admin/admin-users', icon: Users, label: 'Admin Users' },
     ],
@@ -97,9 +89,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'User Coach & Support',
     items: [
-      { href: '/coach', icon: ChatBubbleLeftRight, label: 'Security Coach' },
-      { href: '/coach?type=dns_sinkhole', icon: Globe, label: 'DNS Sinkhole Coach' },
-      { href: '/coach?type=cate_denial', icon: ShieldAlert, label: 'CATE Denial Coach' },
+      { href: '/coach', icon: ChatBubbleLeftRight, label: 'Security Coach Portal' },
     ],
   },
   {
