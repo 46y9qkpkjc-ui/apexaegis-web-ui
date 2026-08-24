@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HiOutlineExclamationTriangle, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineArrowPath, HiOutlineShieldCheck, HiOutlineClock, HiOutlineCpuChip, HiOutlineSignal, HiOutlineGlobeAlt, HiOutlineDocumentText, HiOutlineCommandLine, HiOutlineChatBubbleLeftRight, HiOutlineEnvelope, HiOutlineArrowUturnLeft } from 'react-icons/hi2';
+import { HiOutlineExclamationTriangle, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineArrowPath, HiOutlineShieldCheck, HiOutlineClock, HiOutlineCpuChip, HiOutlineSignal, HiOutlineGlobeAlt, HiOutlineDocumentText, HiOutlineCommandLine, HiOutlineChatBubbleLeftRight, HiOutlineEnvelope, HiOutlineArrowUturnLeft, HiOutlineSearch } from 'react-icons/hi2';
 import { FiRefreshCw, FiSearch, FiDownload, FiSend, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 // Types
