@@ -18,6 +18,7 @@ import {
   ChevronRight, ChevronLeft, ShieldCheck, Award, Workflow,
   ShieldAlert, Search, ShieldOff, Building2,
   Database, UserCog, Radar, Compass,
+  MagnifyingGlass, DocumentText, ChatBubbleLeftRight, ArrowPath,
 } from 'lucide-react';
 
 interface NavItem {
@@ -76,6 +77,14 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Causal Forensics & Remediation',
+    items: [
+      { href: '/forensics', icon: MagnifyingGlass, label: 'Forensic Hub' },
+      { href: '/forensics/remediation', icon: ArrowPath, label: 'Remediation Actions' },
+      { href: '/operations/ledger', icon: Database, label: 'Ledger Operations & Rollback' },
+    ],
+  },
+  {
     label: 'Break-Glass & Approvals',
     items: [
       { href: '/approvals', icon: ShieldCheck, label: 'Ephemeral Overrides' },
@@ -83,6 +92,14 @@ const navGroups: NavGroup[] = [
       { href: '/approvals/audit', icon: ShieldAlert, label: 'Override Audit Log' },
       { href: '/admin/rbac', icon: UserCog, label: 'RBAC / Roles' },
       { href: '/admin/admin-users', icon: Users, label: 'Admin Users' },
+    ],
+  },
+  {
+    label: 'User Coach & Support',
+    items: [
+      { href: '/coach', icon: ChatBubbleLeftRight, label: 'Security Coach' },
+      { href: '/coach?type=dns_sinkhole', icon: Globe, label: 'DNS Sinkhole Coach' },
+      { href: '/coach?type=cate_denial', icon: ShieldAlert, label: 'CATE Denial Coach' },
     ],
   },
   {
