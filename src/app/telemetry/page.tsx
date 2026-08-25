@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bot, Brain, AlertTriangle, CheckCircle, Clock, Shield,
   ChevronDown, ChevronUp, FileText, Send, Lock, Ban,
-  Globe, Cpu, Activity, Network
+  Globe, Cpu, Activity, Network, Zap
 } from 'lucide-react';
 
 // Types
@@ -191,9 +191,9 @@ export default function TelemetryPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Event List */}
-        <div className="lg:col-span-2 space-y-2">
+        <div className="space-y-2">
           {filteredEvents.map((event) => (
             <motion.div
               key={event.id}
@@ -243,7 +243,7 @@ export default function TelemetryPage() {
         </div>
 
         {/* Event Detail Panel */}
-        <div className="lg:col-span-1">
+        <div>
           {selectedEvent ? (
             <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 sticky top-4 space-y-3">
               {/* Event Header */}
@@ -360,10 +360,4 @@ export default function TelemetryPage() {
   );
 }
 
-function Zap(props: { size: number; className?: string }) {
-  return (
-    <svg width={props.size} height={props.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  );
-}
+

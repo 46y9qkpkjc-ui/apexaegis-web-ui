@@ -117,15 +117,17 @@ export default function OperationsPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-100">Break-Glass & State Rollback</h1>
-        <p className="text-xs text-gray-400 mt-1">
-          Emergency deterministic bypasses, CISO signature workflows, and cryptographic state reversion.
-        </p>
+      <div className="flex items-center justify-end">
+        <div className="text-right">
+          <h1 className="text-xl font-bold text-gray-100">Break-Glass & State Rollback</h1>
+          <p className="text-xs text-gray-400 mt-1">
+            Emergency deterministic bypasses, CISO signature workflows, and cryptographic state reversion.
+          </p>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1.5 flex-wrap border-b border-gray-800 pb-1">
+      <div className="flex gap-1.5 flex-wrap border-b border-gray-800 pb-1 justify-end">
         {tabs.map(tab => {
           const Icon = tab.icon;
           return (

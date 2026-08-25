@@ -162,11 +162,13 @@ export default function ForensicsPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-100">Causal Forensic & Remediation Hub</h1>
-        <p className="text-xs text-gray-400 mt-1">
-          Forensic investigation and deterministic recovery engine across the 4 core risk pillars.
-        </p>
+      <div className="flex items-center justify-end">
+        <div className="text-right">
+          <h1 className="text-xl font-bold text-gray-100">Causal Forensic & Remediation Hub</h1>
+          <p className="text-xs text-gray-400 mt-1">
+            Forensic investigation and deterministic recovery engine across the 4 core risk pillars.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -300,7 +302,9 @@ export default function ForensicsPage() {
 
               {/* Remediation Actions */}
               <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">AI-Guided Single-Click Remediation</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">AI-Guided Single-Click Remediation</h3>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   {selectedRecord.remediations.map((rem) => {
                     const Icon = REMEDIATION_ICONS[rem.icon] || RefreshCw;

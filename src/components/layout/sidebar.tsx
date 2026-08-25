@@ -111,6 +111,12 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Digital Experience',
+    items: [
+      { href: '/digital-qoe', icon: Activity, label: 'Unified QoE' },
+    ],
+  },
+  {
     label: 'Identity & Security',
     items: [
       { href: '/identity/users', icon: Users, label: 'Users & Groups' },
