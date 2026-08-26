@@ -36,9 +36,10 @@ const STEP_SUPPLY_CHAIN_SANDBOX = 4;
 const STEP_RISK_TAXONOMY = 5;
 const STEP_APPS_DISCOVERY = 6;
 const STEP_QOE_NIC = 7;
-const STEP_SOVEREIGN_CELL = 8;
-const STEP_PROVISION = 9;
-const STEP_DONE = 10;
+const STEP_INLINE_PROXY_CERT = 8;
+const STEP_SOVEREIGN_CELL = 9;
+const STEP_PROVISION = 10;
+const STEP_DONE = 11;
 
 const CONFIG_STEPS = [
   STEP_FRAMEWORKS,
@@ -48,6 +49,7 @@ const CONFIG_STEPS = [
   STEP_RISK_TAXONOMY,
   STEP_APPS_DISCOVERY,
   STEP_QOE_NIC,
+  STEP_INLINE_PROXY_CERT,
   STEP_SOVEREIGN_CELL
 ];
 
@@ -131,6 +133,16 @@ export function FirstTimeSetup() {
   const [logRetentionPeriod, setLogRetentionPeriod] = useState('180-days');
   const [selectedTelemetryPartner, setSelectedTelemetryPartner] = useState('crowdstrike');
   const [webhookUrl] = useState('https://ingest.apexaegis.app/v1/telemetry/wh_live_9f82d018c');
+
+  // Inline Proxy MITM Signing Certificate
+  const [proxyCertMode, setProxyCertMode] = useState<'generate' | 'upload'>('generate');
+  const [proxyCertFile, setProxyCertFile] = useState<File | null>(null);
+  const [proxyKeyFile, setProxyKeyFile] = useState<File | null>(null);
+  const [proxyCaFile, setProxyCaFile] = useState<File | null>(null);
+  const [proxyCertCn, setProxyCertCn] = useState('apexaegis-inline-proxy');
+  const [proxyCertOrg, setProxyCertOrg] = useState('ApexAegis');
+  const [proxyCertExpiry, setProxyCertExpiry] = useState('365');
+  const [proxyCertGenerated, setProxyCertGenerated] = useState(false);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
 
   const applyPersisted = useCallback(() => {
@@ -155,6 +167,11 @@ export function FirstTimeSetup() {
         if (typeof c.geofenceEnforcement === 'string') setGeofenceEnforcement(c.geofenceEnforcement as 'strict_hw' | 'bgp_path' | 'permissive');
         if (typeof c.enablePrivateHiero === 'boolean') setEnablePrivateHiero(c.enablePrivateHiero);
         if (typeof c.logRetentionPeriod === 'string') setLogRetentionPeriod(c.logRetentionPeriod);
+        if (typeof c.proxyCertMode === 'string') setProxyCertMode(c.proxyCertMode as 'generate' | 'upload');
+        if (typeof c.proxyCertCn === 'string') setProxyCertCn(c.proxyCertCn);
+        if (typeof c.proxyCertOrg === 'string') setProxyCertOrg(c.proxyCertOrg);
+        if (typeof c.proxyCertExpiry === 'string') setProxyCertExpiry(c.proxyCertExpiry);
+        if (typeof c.proxyCertGenerated === 'boolean') setProxyCertGenerated(c.proxyCertGenerated);
       }
       const done = localStorage.getItem(COMPLETED_KEY);
       setCompletedAt(done);
@@ -183,6 +200,7 @@ export function FirstTimeSetup() {
     `Initializing Continuous Adaptive Trust engine (0-100 Sensitivity: ${riskSensitivity})`,
     `Governing ${sanctionedApps.length} sanctioned apps with NHI & OAuth boundaries`,
     `Configuring Predictive QoE NIC contention back-off (> ${nicBackoffThreshold}% utilization)`,
+    `${proxyCertGenerated ? 'Uploading' : 'Generating'} inline proxy MITM signing certificate (${proxyCertCn})`,
     `Isolating Sovereign Cell in ${SOVEREIGN_CELL_REGIONS.find(r => r.id === sovereignRegion)?.name}`,
     `Deploying In-Country Private Hiero aBFT Nodes & S3 WORM (${logRetentionPeriod})`,
   ];
@@ -221,6 +239,11 @@ export function FirstTimeSetup() {
       geofenceEnforcement,
       enablePrivateHiero,
       logRetentionPeriod,
+      proxyCertMode,
+      proxyCertCn,
+      proxyCertOrg,
+      proxyCertExpiry,
+      proxyCertGenerated,
     };
     try {
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
@@ -649,11 +672,147 @@ export function FirstTimeSetup() {
                   </select>
                 </div>
               </div>
-              {navRow(STEP_APPS_DISCOVERY, STEP_SOVEREIGN_CELL, 'Continue')}
+              {navRow(STEP_APPS_DISCOVERY, STEP_INLINE_PROXY_CERT, 'Continue')}
             </div>
           )}
 
-          {/* ── 8 · Sovereignty, ITDR & Ledger ── */}
+          {/* ── 8 · Inline Proxy MITM Signing Certificate ── */}
+          {step === STEP_INLINE_PROXY_CERT && (
+            <div>
+              {sectionHead(FileText, 'Inline Proxy Signing Certificate', 'The inline proxy acts as a MITM for SSL/TLS inspection. It needs a signing certificate to generate leaf certs for inspected domains on the fly.')}
+              
+              <div className="space-y-4">
+                {/* Mode Selection */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => { setProxyCertMode('generate'); setProxyCertGenerated(false); }}
+                    className="p-4 rounded-xl border text-left transition-all"
+                    style={{ background: proxyCertMode === 'generate' ? 'rgba(109,74,255,0.12)' : 'rgba(255,255,255,0.02)', borderColor: proxyCertMode === 'generate' ? 'rgba(109,74,255,0.5)' : 'rgba(255,255,255,0.08)' }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap size={18} style={{ color: proxyCertMode === 'generate' ? ACCENT : '#6b7280' }} />
+                      <span className="text-sm font-semibold text-gray-200">Generate Self-Signed</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-relaxed">Quick setup — generates a CA + leaf cert pair for the inline proxy. Best for POC and evaluation environments.</p>
+                  </button>
+                  <button
+                    onClick={() => { setProxyCertMode('upload'); setProxyCertGenerated(false); }}
+                    className="p-4 rounded-xl border text-left transition-all"
+                    style={{ background: proxyCertMode === 'upload' ? 'rgba(109,74,255,0.12)' : 'rgba(255,255,255,0.02)', borderColor: proxyCertMode === 'upload' ? 'rgba(109,74,255,0.5)' : 'rgba(255,255,255,0.08)' }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Download size={18} style={{ color: proxyCertMode === 'upload' ? ACCENT : '#6b7280' }} />
+                      <span className="text-sm font-semibold text-gray-200">Upload Existing</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-relaxed">Upload your enterprise CA certificate + private key for production SSL inspection signing.</p>
+                  </button>
+                </div>
+
+                {/* Generate Mode */}
+                {proxyCertMode === 'generate' && (
+                  <div className="p-4 rounded-xl border border-white/10 bg-white/5 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Common Name (CN)</label>
+                        <input value={proxyCertCn} onChange={e => setProxyCertCn(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg text-sm text-gray-100 bg-black/40 border border-white/10 outline-none focus:border-purple-500" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Organization (O)</label>
+                        <input value={proxyCertOrg} onChange={e => setProxyCertOrg(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg text-sm text-gray-100 bg-black/40 border border-white/10 outline-none focus:border-purple-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Validity Period</label>
+                      <select value={proxyCertExpiry} onChange={e => setProxyCertExpiry(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-100 bg-black/40 border border-white/10 outline-none">
+                        <option value="90" className="bg-[#141033]">90 Days (POC)</option>
+                        <option value="365" className="bg-[#141033]">1 Year (Standard)</option>
+                        <option value="730" className="bg-[#141033]">2 Years (Extended)</option>
+                        <option value="1095" className="bg-[#141033]">3 Years (Enterprise)</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => setProxyCertGenerated(true)}
+                      disabled={proxyCertGenerated}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-all"
+                      style={{ background: proxyCertGenerated ? 'rgba(34,197,94,0.2)' : `linear-gradient(90deg,${ACCENT},#8b6dff)` }}
+                    >
+                      {proxyCertGenerated ? (
+                        <><Check size={15} className="inline mr-2" /> Certificate Generated & Ready</>
+                      ) : (
+                        <><Zap size={15} className="inline mr-2" /> Generate CA + Leaf Certificate</>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Upload Mode */}
+                {proxyCertMode === 'upload' && (
+                  <div className="p-4 rounded-xl border border-white/10 bg-white/5 space-y-3">
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">CA / Root Certificate (PEM, CRT, CER)</label>
+                      <input type="file" accept=".pem,.crt,.cer,.p7b"
+                        onChange={e => setProxyCaFile(e.target.files?.[0] || null)}
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-300 bg-black/40 border border-white/10 outline-none file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:text-white" style={{ backgroundClip: 'padding-box' }} />
+                      {proxyCaFile && <span className="text-[11px] text-green-400 mt-1 block"><Check size={12} className="inline mr-1" /> {proxyCaFile.name}</span>}
+                    </div>
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Signing Certificate (PEM, CRT)</label>
+                      <input type="file" accept=".pem,.crt,.cer"
+                        onChange={e => setProxyCertFile(e.target.files?.[0] || null)}
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-300 bg-black/40 border border-white/10 outline-none file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:text-white" style={{ backgroundClip: 'padding-box' }} />
+                      {proxyCertFile && <span className="text-[11px] text-green-400 mt-1 block"><Check size={12} className="inline mr-1" /> {proxyCertFile.name}</span>}
+                    </div>
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Private Key (PEM, KEY)</label>
+                      <input type="file" accept=".pem,.key"
+                        onChange={e => setProxyKeyFile(e.target.files?.[0] || null)}
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-300 bg-black/40 border border-white/10 outline-none file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:text-white" style={{ backgroundClip: 'padding-box' }} />
+                      {proxyKeyFile && <span className="text-[11px] text-green-400 mt-1 block"><Check size={12} className="inline mr-1" /> {proxyKeyFile.name}</span>}
+                    </div>
+                    <button
+                      onClick={() => setProxyCertGenerated(true)}
+                      disabled={proxyCertGenerated || !proxyCaFile || !proxyCertFile || !proxyKeyFile}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-40"
+                      style={{ background: proxyCertGenerated ? 'rgba(34,197,94,0.2)' : `linear-gradient(90deg,${ACCENT},#8b6dff)` }}
+                    >
+                      {proxyCertGenerated ? (
+                        <><Check size={15} className="inline mr-2" /> Certificate Uploaded & Verified</>
+                      ) : (
+                        <><Download size={15} className="inline mr-2" /> Upload & Verify Certificate</>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Info Box */}
+                <div className="p-3 rounded-xl border border-purple-500/20 bg-purple-500/5">
+                  <p className="text-[11.5px] text-purple-300 leading-relaxed">
+                    <ShieldAlert size={13} className="inline mr-1.5" />
+                    The inline proxy uses this certificate to dynamically sign leaf certificates for domains during SSL/TLS inspection. 
+                    Browsers will trust these certificates if the CA is installed in the endpoint&apos;s trust store via the ApexAegis agent or GPO.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/5">
+                <button onClick={() => setStep(STEP_QOE_NIC)} className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-200">
+                  <ArrowLeft size={15} /> Back
+                </button>
+                <button
+                  onClick={() => { setProxyCertGenerated(true); setStep(STEP_SOVEREIGN_CELL); }}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all shadow-lg"
+                  style={{ background: `linear-gradient(90deg,${ACCENT},#8b6dff)` }}
+                >
+                  {proxyCertGenerated ? 'Continue' : 'Skip (Use Default)'} <ArrowRight size={15} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── 9 · Sovereignty, ITDR & Ledger ── */}
           {step === STEP_SOVEREIGN_CELL && (
             <div>
               {sectionHead(Database, 'Sovereignty, ITDR Ingestion & Immutable Ledger', 'Configure in-country enclave boundaries, telemetry streaming guides, and private Hiero aBFT state verification.')}
@@ -742,7 +901,7 @@ export function FirstTimeSetup() {
               </div>
 
               <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/5">
-                <button onClick={() => setStep(STEP_QOE_NIC)} className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-200">
+                <button onClick={() => setStep(STEP_INLINE_PROXY_CERT)} className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-200">
                   <ArrowLeft size={15} /> Back
                 </button>
                 <button onClick={() => { setProvisionIdx(0); setStep(STEP_PROVISION); }}
