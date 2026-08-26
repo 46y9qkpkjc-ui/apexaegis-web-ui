@@ -22,6 +22,10 @@ import {
   Fingerprint, FileText, Download, Bot, Box, ShieldAlert
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
+import { SetupTypeStep } from './setup-type-step';
+import { TenantLookupStep, type TenantLookupResult } from './tenant-lookup-step';
+import { SaaSRestrictionStep, type SaaSAccessConfig } from './saas-restriction-step';
+import { MigrationSourceStep, type MigrationConfig } from './migration-source-step';
 
 const ACCENT = '#6D4AFF';
 const CONFIG_KEY = 'aa_governance_config';
@@ -29,17 +33,21 @@ const COMPLETED_KEY = 'aa_governance_completed';
 
 // Wizard Step Sequence
 const STEP_WELCOME = 0;
-const STEP_FRAMEWORKS = 1;
-const STEP_IDP_ONBOARDING = 2;
-const STEP_AGENTIC_DEFENSE = 3;
-const STEP_SUPPLY_CHAIN_SANDBOX = 4;
-const STEP_RISK_TAXONOMY = 5;
-const STEP_APPS_DISCOVERY = 6;
-const STEP_QOE_NIC = 7;
-const STEP_INLINE_PROXY_CERT = 8;
-const STEP_SOVEREIGN_CELL = 9;
-const STEP_PROVISION = 10;
-const STEP_DONE = 11;
+const STEP_SETUP_TYPE = 1;
+const STEP_TENANT_LOOKUP = 2;
+const STEP_FRAMEWORKS = 3;
+const STEP_IDP_ONBOARDING = 4;
+const STEP_AGENTIC_DEFENSE = 5;
+const STEP_SUPPLY_CHAIN_SANDBOX = 6;
+const STEP_RISK_TAXONOMY = 7;
+const STEP_APPS_DISCOVERY = 8;
+const STEP_SAAS_RESTRICTION = 9;
+const STEP_QOE_NIC = 10;
+const STEP_INLINE_PROXY_CERT = 11;
+const STEP_SOVEREIGN_CELL = 12;
+const STEP_MIGRATION_SOURCE = 13;
+const STEP_PROVISION = 14;
+const STEP_DONE = 15;
 
 const CONFIG_STEPS = [
   STEP_FRAMEWORKS,
@@ -48,6 +56,7 @@ const CONFIG_STEPS = [
   STEP_SUPPLY_CHAIN_SANDBOX,
   STEP_RISK_TAXONOMY,
   STEP_APPS_DISCOVERY,
+  STEP_SAAS_RESTRICTION,
   STEP_QOE_NIC,
   STEP_INLINE_PROXY_CERT,
   STEP_SOVEREIGN_CELL
@@ -145,6 +154,12 @@ export function FirstTimeSetup() {
   const [proxyCertGenerated, setProxyCertGenerated] = useState(false);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
 
+  // New wizard states: Setup Type, Tenant Lookup, SaaS Restriction
+  const [setupType, setSetupType] = useState<'new' | 'migration' | null>(null);
+  const [tenantData, setTenantData] = useState<TenantLookupResult | null>(null);
+  const [saasConfig, setSaaSConfig] = useState<SaaSAccessConfig | null>(null);
+  const [migrationConfig, setMigrationConfig] = useState<MigrationConfig | null>(null);
+
   const applyPersisted = useCallback(() => {
     try {
       const raw = localStorage.getItem(CONFIG_KEY);
@@ -222,6 +237,10 @@ export function FirstTimeSetup() {
 
   const finish = () => {
     const config = {
+      setupType,
+      tenantData,
+      saasConfig,
+      migrationConfig,
       selectedFrameworks,
       selectedIdp,
       idpIssuerUrl,
@@ -347,7 +366,7 @@ export function FirstTimeSetup() {
                   </button>
                 )}
                 <button
-                  onClick={() => setStep(STEP_FRAMEWORKS)}
+                  onClick={() => setStep(STEP_SETUP_TYPE)}
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium text-white transition-all shadow-lg"
                   style={{ background: `linear-gradient(90deg,${ACCENT},#8b6dff)` }}
                 >
@@ -355,6 +374,40 @@ export function FirstTimeSetup() {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* ── 1 · Setup Type ── */}
+          {step === STEP_SETUP_TYPE && (
+            <SetupTypeStep
+              onSelect={(type) => {
+                setSetupType(type);
+                if (type === 'new') setStep(STEP_TENANT_LOOKUP);
+                else setStep(STEP_MIGRATION_SOURCE);
+              }}
+              onBack={() => setStep(STEP_WELCOME)}
+            />
+          )}
+
+          {/* ── 2 · Tenant Lookup (New Setup only) ── */}
+          {step === STEP_TENANT_LOOKUP && (
+            <TenantLookupStep
+              onNext={(data) => {
+                setTenantData(data);
+                setStep(STEP_FRAMEWORKS);
+              }}
+              onBack={() => setStep(STEP_SETUP_TYPE)}
+            />
+          )}
+
+          {/* ── Migration Source (Migration only) ── */}
+          {step === STEP_MIGRATION_SOURCE && (
+            <MigrationSourceStep
+              onNext={(data) => {
+                setMigrationConfig(data);
+                setStep(STEP_PROVISION);
+              }}
+              onBack={() => setStep(STEP_SETUP_TYPE)}
+            />
           )}
 
           {/* ── 1 · Governance Frameworks ── */}
@@ -382,7 +435,7 @@ export function FirstTimeSetup() {
                   );
                 })}
               </div>
-              {navRow(STEP_WELCOME, STEP_IDP_ONBOARDING, `Continue (${selectedFrameworks.length} Selected)`, selectedFrameworks.length === 0)}
+              {navRow(setupType === 'new' ? STEP_TENANT_LOOKUP : STEP_SETUP_TYPE, STEP_IDP_ONBOARDING, `Continue (${selectedFrameworks.length} Selected)`, selectedFrameworks.length === 0)}
             </div>
           )}
 
@@ -640,8 +693,20 @@ export function FirstTimeSetup() {
                   );
                 })}
               </div>
-              {navRow(STEP_RISK_TAXONOMY, STEP_QOE_NIC, `Continue (${sanctionedApps.length} Sanctioned)`)}
+              {navRow(STEP_RISK_TAXONOMY, STEP_SAAS_RESTRICTION, `Continue (${sanctionedApps.length} Sanctioned)`)}
             </div>
+          )}
+
+          {/* ── 7 · Tenant-Scoped SaaS Access ── */}
+          {step === STEP_SAAS_RESTRICTION && tenantData && (
+            <SaaSRestrictionStep
+              tenantData={tenantData}
+              onNext={(config) => {
+                setSaaSConfig(config);
+                setStep(STEP_QOE_NIC);
+              }}
+              onBack={() => setStep(STEP_APPS_DISCOVERY)}
+            />
           )}
 
           {/* ── 7 · Predictive QoE & NIC Optimization ── */}
