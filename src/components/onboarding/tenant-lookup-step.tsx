@@ -31,33 +31,18 @@ const PROVIDERS = [
   { id: 'onelogin', name: 'OneLogin', icon: '🟢', desc: 'OneLogin SSO', discoverUrl: 'https://{domain}/.well-known/openid-configuration' },
 ];
 
-// Simulated tenant lookup — in production this calls the MP API
+// Tenant lookup — calls the MP API to reverse-lookup the tenant GUID
 async function lookupTenant(domain: string, provider: string): Promise<TenantLookupResult> {
-  // Simulate API call delay
-  await new Promise(r => setTimeout(r, 1500));
-
-  // Simulated response based on provider
-  const tenantNames: Record<string, string> = {
-    entra: `${domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)} Corporation`,
-    google: `${domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)} Workspace`,
-    okta: `${domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)} Identity`,
-    onelogin: `${domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)} SSO`,
-  };
-
-  const tenantIds: Record<string, string> = {
-    entra: 'f2a3b8c1-9d4e-4f5a-8b7c-6e0d1f2a3b4c',
-    google: domain,
-    okta: '0oa1b2c3d4e5f6g7h8i9j',
-    onelogin: '12345678-1234-1234-1234-123456789012',
-  };
-
-  return {
-    domain,
-    provider,
-    tenantId: tenantIds[provider] || '',
-    tenantName: tenantNames[provider] || domain,
-    discoveredServices: ['Microsoft 365', 'Teams', 'OneDrive', 'SharePoint', 'Azure AD'],
-  };
+  const res = await fetch('/api/tenant/lookup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ domain, provider }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Tenant lookup failed');
+  }
+  return res.json();
 }
 
 export function TenantLookupStep({ onNext, onBack }: TenantLookupStepProps) {
