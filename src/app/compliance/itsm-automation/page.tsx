@@ -216,7 +216,24 @@ export default function ITSMAutomationPage() {
   const [coachReqs, setCoachReqs] = useState<{ ticket: string; domain: string; score: number; priority: string; status: string; at: number }[]>([]);
   useEffect(() => {
     let alive = true;
-    const load = () => fetch('/api/demo-itsm', { cache: 'no-store' }).then(r => r.json()).then(d => { if (alive && Array.isArray(d.requests)) setCoachReqs(d.requests); }).catch(() => {});
+    const load = async () => {
+      try {
+        const { listTickets } = await import('@/lib/itsm-api');
+        const data = await listTickets();
+        if (!alive) return;
+        const mapped = (data.tickets ?? []).map((t) => ({
+          ticket: t.ticket_key,
+          domain: t.domain || '',
+          score: t.ai_score ?? 0,
+          priority: t.priority,
+          status: t.status,
+          at: t.created_at ? new Date(t.created_at).getTime() / 1000 : 0,
+        }));
+        setCoachReqs(mapped);
+      } catch {
+        // backend may not be running — keep empty
+      }
+    };
     load();
     const t = setInterval(load, 20000);
     return () => { alive = false; clearInterval(t); };
